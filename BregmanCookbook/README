@@ -1,0 +1,41 @@
+BREGMAN TOOLBOX
+
+Current version: 
+1.2 - Deconvolution functions now accept both kernels defined in spatial or Fourier domains.
+
+Previous version:
+1.0
+ 
+Date: 05/07/2011
+
+This toolbox provides the source code associated with the Bregman Cookbook available at
+http://math.ucla.edu/~jegilles
+
+This software is free and should be used only for nonprofit purposes. Any
+unauthorized use of this software for industrial or profit-oriented
+activities is expressively prohibited.
+
+Some functions need some extra toolbox:
+- Framelet toolbox, written by Jianfeng Cai and available at http://math.ucla.edu/~jegilles
+- Curvelab toolbox, freely available for non-profit purposes at http://www.curvelet.org
+
+These toolbox are assumed to be installed properly on your computer (ie the corresponding
+Paths are added into Matlab).
+
+This toolbox contains the following files:
+
+-AddCurveletArray.m : sum the curvelet coefficients of two decomposition structures
+-AddFrameletArray.m : sum the framelet coefficients of two decomposition structures
+-ATV_NB_Deconvolution.m : performs the Nonblind Anisotropic Total Variation Deconvolution
+-ATV_ROF.m : performs the Anisotropic Total Variation Denoising
+-Curvelet_NB_Deconvolution.m : performs the Nonblind Deconvolution based on Curvelet sparsity
+-Framelet_NB_Deconvolution.m : performs the Nonblind Deconvolution based on Framelet sparsity (Analysis approach)
+-Framelet_NB_Deconvolution2.m : performs the Nonblind Deconvolution based on Framelet sparsity (Synthesis approach)
+-L1_SplitBregmanIteration.m : performs the recovery of a sparse signal affected by a known linear operator
+-README : this file!
+-ShrinkCurvelet.m : performs the shrinkage of curvelet coefficients
+-ShrinkFramelet.m : performs the shrinkage of framelet coefficients
+-SubCurveletArray.m : substract the curvelet coefficients of two decomposition structures
+-SubFrameletArray.m : substract the framelet coefficients of two decomposition structures
+
+For any questions, bugs report, suggestions, ... Feel free to contact me at jegilles@math.ucla.edu
