@@ -9,23 +9,22 @@ addpath('./BregmanCookbook/');
 vec = inline('reshape(x,[numel(x) 1])','x');
 unvec = inline('reshape(x,[m n])','x','m','n');
 
-img = double(rgb2gray(imread('bouchard_mri_clean.png')));
-%img = double(imread('phantom.gif'));
+%img = double(rgb2gray(imread('bouchard_mri_clean.png')));
+img = double(imread('phantom.gif'));
 %load mri;
 %img = double(D(:,:,1,13));
 
 [m n] = size(img);
 
-num_samples = round(m*n/pi);
+num_samples = round(m*n/4.1);
 
 R = zeros(m,n);
 R(randsample(1:m*n, num_samples)) = 1.0;
-A = @(x) R.*fft2(x);
-At = @(x) ifft2(R.*x);
-%
-% Am = randn(num_samples, m*n);
-% A = @(x) Am*vec(x);
-% At = @(x) unvec( Am'*x, m, n);
+scale = sqrt(m*n); %only needed when using matlab FFT
+
+A = @(x) R.*fft2(x)/scale;
+At = @(x) ifft2(R.*x)*scale;
+
 
 f = A(img);
 
@@ -37,70 +36,83 @@ f = A(img);
 %and worse quality. Hmm.
 n_level = 1;
 
-%how to framelet decompose and recompose. The decomposed coeff are in a
-%cell or somthing
-%Dimg = FraDecMultiLevel(img,D,n_level);
-%DtDimg = FraRecMultiLevel(Dimg,Dt,n_level);
 
+%We minimize nu*|nabla u| + exci*|Du| st Au = f
+nu = 1;
+exci = 1;
 
-
-%AtA = @(x) vec( At(A( unvec(x,m,n) )) + lambda.*unvec(x,m,n) );
-
+%mu is the exterior constraint split
+%gamma is the framelet split
+%lambda is the TV split
+%I think they all be .5
 mu = .5;
 lambda = .5;
+gamma = .5;
 
-% a = .3;
-% b = .6;    
-% mu = (b-a)*rand() + a
-% lambda = (b-a)*rand() + a
+if nu == 0
+    lambda = 0;
+end
+if exci == 0
+    gamma = 0;
+end
 
-AtA = @(x) vec( mu*At(A( unvec(x,m,n) )) + lambda.*unvec(x,m,n) );
-%AtA = mu*(Am'*Am) + lambda*eye(m*n);
+%L = laplacian(m*n);
+lk = zeros(m,n);
+lk(1,1) = 4;lk(1,2)=-1;lk(2,1)=-1;lk(m,1)=-1;lk(1,n)=-1;
+AtA = @(x) vec( mu*At(A( unvec(x,m,n) )) + lambda*ifft2(fft2(reshape(x,m,n)).*fft2(lk)) + gamma.*unvec(x,m,n) );
 
-%
-% %wtf?
+%set initial guesses
 U = FraDecMultiLevel(zeros(m,n),D,n_level);
-dk = U;
-bk = U;
-u = norm(f).*randn(size(f));
+dw = U;
+bw = U;
+u = At(f);
+dx = zeros(size(u));
+dy = zeros(size(u));
+bx = zeros(size(u));
+by = zeros(size(u));
 
-
-errors = [1];
 
 %constrained, replace f with fl and update after each unconstrained
-tol = 1e-2;
+tol = 1e-4;
 fl = f;
-while errors(end) > tol
-
+errors = [tol tol*3];
+for l = 1:1000
     %unconstrained
-    for k=1:randi(1)
+    for k=1:randi(3)
         %update u
-        rhs = FraRecMultiLevel(SubFrameletArray(dk,bk),Dt,n_level);
-        rhs = mu*At(fl) + lambda.*rhs;
+        rhsD = FraRecMultiLevel(SubFrameletArray(dw,bw),Dt,n_level);
+        rhs = mu.*At(fl) + lambda.*Dxt(dx - bx) + lambda.*Dyt(dy - by) + gamma.*rhsD;
         
         [u,flag,reles,iter] = pcg(AtA,vec(rhs),1e-4,20);
         if randi(5)==randi(5)
             fprintf('                                 pcg error: %d, iter: %i \n', [reles iter]);
         end
-
+        
         u = unvec(u,m,n);
-               
-        %update d
-        U = AddFrameletArray(FraDecMultiLevel(u,D,n_level),bk); %Du + b_k
-        dk = ShrinkFramelet(U,1/lambda);
         
-        %update b
-        bk = SubFrameletArray(U,dk); %U-d_k
+        %update d's
+        U = AddFrameletArray(FraDecMultiLevel(u,D,n_level),bw); %Du + b_k
+        if gamma ~= 0 && exci ~= 0
+            dw = ShrinkFramelet(U,1/(gamma/exci));
+        end
         
+        if lambda ~=0 && nu ~= 0
+            [dx,dy] = shrink2( Dx(u)+bx, Dy(u)+by,1/(lambda/nu));
+        end
+        
+        %update b's
+        bw = SubFrameletArray(U,dw); %U-d_k
+        bx = bx + (Dx(u) - dx);
+        by = by + (Dy(u) - dy);
         
     end
     fl = fl + f - A(u);
     
     %surf(abs(u),'EdgeColor','None');
     %view(160,100)
-    imagesc(abs(u))
+    imagesc(real(u))
     colormap bone;
-    pause(0.015);
+    pause(0.01);
     
     errors = [errors norm(u - img)/norm(img)];
     
