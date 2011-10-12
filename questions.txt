@@ -1,0 +1,4 @@
+Why does lambda=.5, mu=.2 matter so much?
+Why do multilevel decompositions suck?
+Why can't I do anything with Haar Wavelets?
+I should combine TV+framelets.That will fix everything.

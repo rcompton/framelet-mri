@@ -9,11 +9,14 @@ addpath('./BregmanCookbook/');
 vec = inline('reshape(x,[numel(x) 1])','x');
 unvec = inline('reshape(x,[m n])','x','m','n');
 
-%img = double(rgb2gray(imread('../bouchard_mri_clean.png')));
-img = double(imread('phantom.gif'));
+img = double(rgb2gray(imread('bouchard_mri_clean.png')));
+%img = double(imread('phantom.gif'));
+%load mri;
+%img = double(D(:,:,1,13));
+
 [m n] = size(img);
 
-num_samples = round(m*n/4);
+num_samples = round(m*n/pi);
 
 R = zeros(m,n);
 R(randsample(1:m*n, num_samples)) = 1.0;
@@ -27,9 +30,11 @@ At = @(x) ifft2(R.*x);
 f = A(img);
 
 %1 is for Haar, 2 is for framelet, 3 is for cubic framelet
+%Haar sucks. 2 works best, 3 is slower and worse.
 [D,Dt]=GenerateFrameletFilter(2);
 
-%more levels is better? I don't know
+%more levels is better? I don't know. Experimentally, more levels is slow
+%and worse quality. Hmm.
 n_level = 1;
 
 %how to framelet decompose and recompose. The decomposed coeff are in a
@@ -57,23 +62,27 @@ AtA = @(x) vec( mu*At(A( unvec(x,m,n) )) + lambda.*unvec(x,m,n) );
 U = FraDecMultiLevel(zeros(m,n),D,n_level);
 dk = U;
 bk = U;
+u = norm(f).*randn(size(f));
 
-n_outer = 1250;
-n_inner = 1;
-errors = zeros(n_outer, 1);
+
+errors = [1];
 
 %constrained, replace f with fl and update after each unconstrained
-
+tol = 1e-2;
 fl = f;
-for l=1:n_outer
+while errors(end) > tol
 
     %unconstrained
-    for k=1:randi(20),
+    for k=1:randi(1)
         %update u
         rhs = FraRecMultiLevel(SubFrameletArray(dk,bk),Dt,n_level);
         rhs = mu*At(fl) + lambda.*rhs;
         
-        [u,~] = pcg(AtA,vec(rhs),1e-3,20);
+        [u,flag,reles,iter] = pcg(AtA,vec(rhs),1e-4,20);
+        if randi(5)==randi(5)
+            fprintf('                                 pcg error: %d, iter: %i \n', [reles iter]);
+        end
+
         u = unvec(u,m,n);
                
         %update d
@@ -87,13 +96,17 @@ for l=1:n_outer
     end
     fl = fl + f - A(u);
     
-    imagesc(real(u));
+    %surf(abs(u),'EdgeColor','None');
+    %view(160,100)
+    imagesc(abs(u))
     colormap bone;
     pause(0.015);
     
-    errors(l) = norm(u-img,'fro');
-    fprintf('error (not residual): %f \n', errors(l));
-
+    errors = [errors norm(u - img)/norm(img)];
+    
+    if randi(3)==randi(3)
+        fprintf('error ( not residual): %f \n', errors(end));
+    end
 end
 
 figure()
