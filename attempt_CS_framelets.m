@@ -10,23 +10,42 @@ vec = inline('reshape(x,[numel(x) 1])','x');
 unvec = inline('reshape(x,[m n])','x','m','n');
 
 %img = double(rgb2gray(imread('bouchard_mri_clean.png')));
-img = double(imread('phantom.gif'));
-%load mri;
-%img = double(D(:,:,1,13));
+%img = double(imread('phantom.gif'));
+load mri;
+img = double(D(:,:,1,21));
+%img = double(rgb2gray(imread('cleanbrain.png')));
+%img = double(rgb2gray(imread('mri_braint.png')));
+
+
+%crop because I need it to be a square.
+n = min(size(img));
+img = img(1:n,1:n);
 
 [m n] = size(img);
+assert(m==n);
 
-num_samples = round(m*n/4.1);
+num_samples = round(m*n/3.5);
 
 R = zeros(m,n);
 R(randsample(1:m*n, num_samples)) = 1.0;
 scale = sqrt(m*n); %only needed when using matlab FFT
 
-A = @(x) R.*fft2(x)/scale;
-At = @(x) ifft2(R.*x)*scale;
+A = @(x) vec(R.*fft2(unvec(x,m,n))/scale);
+At = @(x) vec(ifft2(R.*unvec(x,m,n))*scale);
+
+%These work on column vectors
+% L = 1;
+% B = ones(n,n*L);
+% C = ones(n,n*L);
+% A = @(x) samplefun(R,B,C,x,0);
+% At = @(x) samplefun(R,B,C,x,1);
 
 
-f = A(img);
+
+f = unvec(A(vec(img)),m,n);
+%not sure why Tom did this
+normFactor = 1/norm(f(:)/size(R==1,1));
+f = f*normFactor;
 
 %1 is for Haar, 2 is for framelet, 3 is for cubic framelet
 %Haar sucks. 2 works best, 3 is slower and worse.
@@ -34,7 +53,7 @@ f = A(img);
 
 %more levels is better? I don't know. Experimentally, more levels is slow
 %and worse quality. Hmm.
-n_level = 1;
+n_level = 5;
 
 
 %We minimize nu*|nabla u| + exci*|Du| st Au = f
@@ -45,8 +64,8 @@ exci = 1;
 %gamma is the framelet split
 %lambda is the TV split
 %I think they all be .5
-mu = .5;
-lambda = .5;
+mu = 1;
+lambda = 1;
 gamma = .5;
 
 if nu == 0
@@ -56,16 +75,25 @@ if exci == 0
     gamma = 0;
 end
 
-%L = laplacian(m*n);
+%create the AtA operator. for some reason lk convolution works best.
 lk = zeros(m,n);
 lk(1,1) = 4;lk(1,2)=-1;lk(2,1)=-1;lk(m,1)=-1;lk(1,n)=-1;
-AtA = @(x) vec( mu*At(A( unvec(x,m,n) )) + lambda*ifft2(fft2(reshape(x,m,n)).*fft2(lk)) + gamma.*unvec(x,m,n) );
+
+%AtA = @(x) vec( mu*At(A( unvec(x,m,n) )) + lambda*ifft2(fft2(reshape(x,m,n)).*fft2(lk)) + gamma.*unvec(x,m,n) );
+
+%using the samplefun
+%AtA = @(x) mu*At(A( x )) + vec(lambda*ifft2(fft2(unvec(x,m,n)).*fft2(lk))) + gamma.*x ;
+%samplev = @(x)samplefun(R,B,C,x,false);
+AtA = @(x) mu*At(A(x)) + vec( lambda*ifft2(fft2(unvec(x,m,n)).*fft2(lk))) + gamma*x;
 
 %set initial guesses
 U = FraDecMultiLevel(zeros(m,n),D,n_level);
 dw = U;
 bw = U;
-u = At(f);
+
+u = unvec(At(vec(f)),m,n);
+%u = randn(m,n);
+
 dx = zeros(size(u));
 dy = zeros(size(u));
 bx = zeros(size(u));
@@ -73,15 +101,17 @@ by = zeros(size(u));
 
 
 %constrained, replace f with fl and update after each unconstrained
-tol = 1e-4;
 fl = f;
-errors = [tol tol*3];
+errors = [0];
+subplot(2,2,1);
+imagesc(img);colormap hot;
+subplot(2,2,2);
 for l = 1:1000
     %unconstrained
-    for k=1:randi(3)
+    for k=1:4
         %update u
         rhsD = FraRecMultiLevel(SubFrameletArray(dw,bw),Dt,n_level);
-        rhs = mu.*At(fl) + lambda.*Dxt(dx - bx) + lambda.*Dyt(dy - by) + gamma.*rhsD;
+        rhs = mu.*unvec(At(vec(fl)),m,n) + lambda.*Dxt(dx - bx) + lambda.*Dyt(dy - by) + gamma.*rhsD;
         
         [u,flag,reles,iter] = pcg(AtA,vec(rhs),1e-4,20);
         if randi(5)==randi(5)
@@ -106,19 +136,26 @@ for l = 1:1000
         by = by + (Dy(u) - dy);
         
     end
-    fl = fl + f - A(u);
+    fl = fl + f - unvec(A(vec(u)),m,n);
     
-    %surf(abs(u),'EdgeColor','None');
-    %view(160,100)
-    imagesc(real(u))
-    colormap bone;
-    pause(0.01);
+    errors = [errors norm(unvec(A(vec(u)),m,n) - f,'fro')/norm(f,'fro')];
     
-    errors = [errors norm(u - img)/norm(img)];
-    
-    if randi(3)==randi(3)
-        fprintf('error ( not residual): %f \n', errors(end));
+    if randi(3)==randi(4)
+        subplot(2,2,2)
+        imagesc(real(u))
+        
+        subplot(2,2,3);
+        plot(errors);
+        
+        subplot(2,2,4);
+        errorfig = abs(u/norm(u) - img/norm(img));
+        imagesc(errorfig);
+        
+        colormap hot;
+        pause(0.01);
     end
+    fprintf('error (Au -f): %f \n', errors(end));
+
 end
 
 figure()
