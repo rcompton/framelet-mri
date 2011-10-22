@@ -5,14 +5,16 @@ close all;clear all;clc;
 
 addpath('./Framelet/');
 addpath('./BregmanCookbook/');
+addpath(genpath('~./Dropbox/irt'));
+
 
 vec = inline('reshape(x,[numel(x) 1])','x');
 unvec = inline('reshape(x,[m n])','x','m','n');
 
 %img = double(rgb2gray(imread('bouchard_mri_clean.png')));
-%img = double(imread('phantom.gif'));
-load mri;
-img = double(D(:,:,1,21));
+img = double(imread('phantom.gif'));
+%load mri;
+%img = double(D(:,:,1,21));
 %img = double(rgb2gray(imread('cleanbrain.png')));
 %img = double(rgb2gray(imread('mri_braint.png')));
 
@@ -30,16 +32,40 @@ R = zeros(m,n);
 R(randsample(1:m*n, num_samples)) = 1.0;
 scale = sqrt(m*n); %only needed when using matlab FFT
 
-A = @(x) vec(R.*fft2(unvec(x,m,n))/scale);
-At = @(x) vec(ifft2(R.*unvec(x,m,n))*scale);
+%A = @(x) vec(R.*fft2(unvec(x,m,n))/scale);
+%At = @(x) vec(ifft2(R.*unvec(x,m,n))*scale);
 
 %These work on column vectors
-% L = 1;
-% B = ones(n,n*L);
-% C = ones(n,n*L);
-% A = @(x) samplefun(R,B,C,x,0);
-% At = @(x) samplefun(R,B,C,x,1);
+ %L = 4;
+ %B = ones(n,n*L)./L;
+ %C = ones(n,n*L)./L;
+ %A = @(x) samplefun(R,B,C,x,0);
+ %At = @(x) samplefun(R,B,C,x,1);
 
+ 
+ %using nufft
+ %define the freq data locations
+[k1pts k2pts] = meshgrid(1:m, 1:n);
+k1pts = reshape(k1pts,numel(k1pts),1)*2*pi/m;
+k2pts = reshape(k2pts,numel(k2pts),1)*2*pi/n;
+omega = [k1pts k2pts];
+omega = omega(sort(randsample(1:max(size(omega)),num_samples)),:);
+ 
+%the number of neighbors to use when interpolating
+j1 = 15;
+j2 = 15;
+%the fft sizes?
+k1 = 2*m;
+k2 = 2*n;
+
+%make the nufft object
+args = {omega, [m n], [j1 j2], [k1 k2]};
+st = nufft_init(omega, [m n], [j1 j2], [k1 k2]);
+
+scale_factor = sqrt(num_samples);
+
+A = @(x) nufft(unvec(x,m,n),st)./scale_factor;
+At = @(x) vec(nufft_adj(x,st)./scale_factor);
 
 
 f = unvec(A(vec(img)),m,n);
@@ -53,7 +79,7 @@ f = f*normFactor;
 
 %more levels is better? I don't know. Experimentally, more levels is slow
 %and worse quality. Hmm.
-n_level = 5;
+n_level = 1;
 
 
 %We minimize nu*|nabla u| + exci*|Du| st Au = f
