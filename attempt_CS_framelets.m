@@ -64,11 +64,13 @@ st = nufft_init(omega, [m n], [j1 j2], [k1 k2]);
 
 scale_factor = sqrt(num_samples);
 
+%input vectors and output vectors as needed by pcg. Note that the output of
+%nufft_adj has m*n elements but nufft outputs num_samples x 1 column vecotr
 A = @(x) nufft(unvec(x,m,n),st)./scale_factor;
 At = @(x) vec(nufft_adj(x,st)./scale_factor);
 
 
-f = unvec(A(vec(img)),m,n);
+f = A(vec(img));
 %not sure why Tom did this
 normFactor = 1/norm(f(:)/size(R==1,1));
 f = f*normFactor;
@@ -162,10 +164,13 @@ for l = 1:1000
         by = by + (Dy(u) - dy);
         
     end
-    fl = fl + f - unvec(A(vec(u)),m,n);
+    %fl = fl + f - unvec(A(vec(u)),m,n);
+    fl = fl + f - A(vec(u));
     
-    errors = [errors norm(unvec(A(vec(u)),m,n) - f,'fro')/norm(f,'fro')];
+%    errors = [errors norm(unvec(A(vec(u)),m,n) - f,'fro')/norm(f,'fro')];
+    errors = [errors norm(A(vec(u)) - f,'fro')/norm(f,'fro')];
     
+
     if randi(3)==randi(4)
         subplot(2,2,2)
         imagesc(real(u))
