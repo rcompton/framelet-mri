@@ -16,17 +16,19 @@ img = double(imread('phantom.gif'));
 %load mri;
 %img = double(D(:,:,1,21));
 %img = double(rgb2gray(imread('cleanbrain.png')));
-%img = double(rgb2gray(imread('mri_braint.png')));
+%img = double(imread('brainweb_t1.jpg'));
+
 
 
 %crop because I need it to be a square.
-n = min(size(img));
-img = img(1:n,1:n);
+%n = min(size(img));
+n = 64;
+img = imresize(img,[n n]);
 
 [m n] = size(img);
 assert(m==n);
 
-num_samples = round(m*n/3.5);
+num_samples = round(m*n/2.5);
 
 R = zeros(m,n);
 R(randsample(1:m*n, num_samples)) = 1.0;
@@ -52,8 +54,8 @@ omega = [k1pts k2pts];
 omega = omega(sort(randsample(1:max(size(omega)),num_samples)),:);
  
 %the number of neighbors to use when interpolating
-j1 = 15;
-j2 = 15;
+j1 = 5;
+j2 = 5;
 %the fft sizes?
 k1 = 2*m;
 k2 = 2*n;
@@ -66,9 +68,19 @@ scale_factor = sqrt(num_samples);
 
 %input vectors and output vectors as needed by pcg. Note that the output of
 %nufft_adj has m*n elements but nufft outputs num_samples x 1 column vecotr
-A = @(x) nufft(unvec(x,m,n),st)./scale_factor;
-At = @(x) vec(nufft_adj(x,st)./scale_factor);
-
+%A = @(x) nufft(unvec(x,m,n),st)./scale_factor;
+%At = @(x) vec(nufft_adj(x,st)./scale_factor);
+L = 1;
+B = cell(1,L);
+for i=1:L
+    B{i} = ones(num_samples,1)/L;
+end
+C = cell(1,L);
+for i=1:L
+    C{i} = ones(m*n,1)/L;
+end
+A = @(x) samplefun_nufft(st,B,C,x,m,n,0);
+At = @(x) samplefun_nufft(st,B,C,x,m,n,1);
 
 f = A(vec(img));
 %not sure why Tom did this
@@ -94,7 +106,7 @@ exci = 1;
 %I think they all be .5
 mu = 1;
 lambda = 1;
-gamma = .5;
+gamma = 5;
 
 if nu == 0
     lambda = 0;
@@ -130,18 +142,21 @@ by = zeros(size(u));
 
 %constrained, replace f with fl and update after each unconstrained
 fl = f;
+errorsr = [0];
 errors = [0];
 subplot(2,2,1);
 imagesc(img);colormap hot;
 subplot(2,2,2);
 for l = 1:1000
     %unconstrained
-    for k=1:4
+    for k=1:3
         %update u
         rhsD = FraRecMultiLevel(SubFrameletArray(dw,bw),Dt,n_level);
         rhs = mu.*unvec(At(vec(fl)),m,n) + lambda.*Dxt(dx - bx) + lambda.*Dyt(dy - by) + gamma.*rhsD;
         
-        [u,flag,reles,iter] = pcg(AtA,vec(rhs),1e-4,20);
+        
+        [u,flag,reles,iter] = pcg(AtA,vec(rhs),1e-3,20);
+        
         if randi(5)==randi(5)
             fprintf('                                 pcg error: %d, iter: %i \n', [reles iter]);
         end
@@ -167,16 +182,19 @@ for l = 1:1000
     %fl = fl + f - unvec(A(vec(u)),m,n);
     fl = fl + f - A(vec(u));
     
-%    errors = [errors norm(unvec(A(vec(u)),m,n) - f,'fro')/norm(f,'fro')];
-    errors = [errors norm(A(vec(u)) - f,'fro')/norm(f,'fro')];
-    
+    errorsr = [errorsr norm(A(vec(u)) - f,'fro')/norm(f,'fro')];
+    errors = [errors norm(u/max(u(:)) - img/max(img(:)),'fro')];
 
-    if randi(3)==randi(4)
+
+    if randi(1)==1
         subplot(2,2,2)
         imagesc(real(u))
         
-        subplot(2,2,3);
-        plot(errors);
+        subplot(6,2,7);
+        plot(errors(end-length(errors)/2 : end));
+        subplot(6,2,9);
+        plot(errorsr(end-length(errorsr)/2 : end-1),'r.-');
+
         
         subplot(2,2,4);
         errorfig = abs(u/norm(u) - img/norm(img));
@@ -184,9 +202,10 @@ for l = 1:1000
         
         colormap hot;
         pause(0.01);
+    
+        fprintf('error (Au -f): %f \n', errors(end));
     end
-    fprintf('error (Au -f): %f \n', errors(end));
-
+    
 end
 
 figure()

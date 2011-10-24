@@ -32,8 +32,8 @@ j1 = 15;
 j2 = 15;
 
 %the fft sizes?
-k1 = 3*n1;
-k2 = 3*n2;
+k1 = 2*n1;
+k2 = 2*n2;
 
 %this sytax
 args = {omega, [n1 n2], [j1 j2], [k1 k2]};
