@@ -24,29 +24,21 @@ img = double(imread('phantom.gif'));
 %n = min(size(img));
 n = 64;
 img = imresize(img,[n n]);
-
 [m n] = size(img);
 assert(m==n);
 
-num_samples = round(m*n/2.5);
+%number of sample for compressed sense
+num_samples = round(m*n/3.5);
 
+%the downsample operator matrix, could be done away with now that I have
+%nufft library but it works and was easy
 R = zeros(m,n);
 R(randsample(1:m*n, num_samples)) = 1.0;
 scale = sqrt(m*n); %only needed when using matlab FFT
 
-%A = @(x) vec(R.*fft2(unvec(x,m,n))/scale);
-%At = @(x) vec(ifft2(R.*unvec(x,m,n))*scale);
-
-%These work on column vectors
- %L = 4;
- %B = ones(n,n*L)./L;
- %C = ones(n,n*L)./L;
- %A = @(x) samplefun(R,B,C,x,0);
- %At = @(x) samplefun(R,B,C,x,1);
-
  
- %using nufft
- %define the freq data locations
+%using nufft
+%define the freq data locations
 [k1pts k2pts] = meshgrid(1:m, 1:n);
 k1pts = reshape(k1pts,numel(k1pts),1)*2*pi/m;
 k2pts = reshape(k2pts,numel(k2pts),1)*2*pi/n;
@@ -56,7 +48,7 @@ omega = omega(sort(randsample(1:max(size(omega)),num_samples)),:);
 %the number of neighbors to use when interpolating
 j1 = 5;
 j2 = 5;
-%the fft sizes?
+%the fft sizes? 2*n works nice.
 k1 = 2*m;
 k2 = 2*n;
 
@@ -64,21 +56,61 @@ k2 = 2*n;
 args = {omega, [m n], [j1 j2], [k1 k2]};
 st = nufft_init(omega, [m n], [j1 j2], [k1 k2]);
 
+%nufft is like fftw in that there is no normalization factor
 scale_factor = sqrt(num_samples);
 
+%Create sample operator
 %input vectors and output vectors as needed by pcg. Note that the output of
 %nufft_adj has m*n elements but nufft outputs num_samples x 1 column vecotr
-%A = @(x) nufft(unvec(x,m,n),st)./scale_factor;
-%At = @(x) vec(nufft_adj(x,st)./scale_factor);
-L = 1;
-B = cell(1,L);
-for i=1:L
-    B{i} = ones(num_samples,1)/L;
-end
+
+% do nothing correction
+% L = 6;
+% B = cell(1,L);
+% for i=1:L
+%     B{i} = randn(num_samples,1)/sqrt(L);
+% end
+% C = cell(1,L);
+% for i=1:L
+%     C{i} = randn(m*n,1)/sqrt(L);
+% end
+
+%Create B and C, this is a solved research problem and I'm not going to
+%bother with making a better interpolator
+L = 3;
+T = .2;
+mt = num_samples;
+t = linspace(0.1,T,mt); %number of time points in the time discreization of continuous time
+tl = linspace(0.1,T,L); %number of time points in to approximate at
+
+%load the other guys field map
+load fmap_test.mat
+
+w = fmap/norm(fmap);
+%w = peaks(n)/norm(peaks(n));
+%w = img./norm(img(:));
+
+
 C = cell(1,L);
-for i=1:L
-    C{i} = ones(m*n,1)/L;
+for l=1:L
+    C{l} = vec(exp(1j*w*tl(l)));
 end
+
+B = cell(1,L);
+for l=1:L
+    B{l} = zeros(num_samples,1);
+end
+for l=1:L-1
+     for i=1:num_samples
+         if (tl(l) <= t(i)) && (t(i) <= tl(l+1))
+             %B(i,(l-1)*N+1:l*N) = 1 - (t(i) - tl(l))/(tl(l+1) - tl(l));
+             %B(i,l+1) = (t(i) - tl(l))/(tl(l+1) - tl(l));
+             
+             B{l}(i) = 1 - (t(i) - tl(l))/(tl(l+1) - tl(l));
+             B{l+1}(i) = (t(i) - tl(l))/(tl(l+1) - tl(l));
+         end
+     end
+ end
+
 A = @(x) samplefun_nufft(st,B,C,x,m,n,0);
 At = @(x) samplefun_nufft(st,B,C,x,m,n,1);
 
@@ -139,6 +171,10 @@ dy = zeros(size(u));
 bx = zeros(size(u));
 by = zeros(size(u));
 
+%movie? sure why not
+aviobj = avifile('cs_recon.avi', 'FPS', 10);
+aviobj.Quality = 10;
+figgn = figure();
 
 %constrained, replace f with fl and update after each unconstrained
 fl = f;
@@ -147,9 +183,9 @@ errors = [0];
 subplot(2,2,1);
 imagesc(img);colormap hot;
 subplot(2,2,2);
-for l = 1:1000
+for ell = 1:160
     %unconstrained
-    for k=1:3
+    for k=1:2
         %update u
         rhsD = FraRecMultiLevel(SubFrameletArray(dw,bw),Dt,n_level);
         rhs = mu.*unvec(At(vec(fl)),m,n) + lambda.*Dxt(dx - bx) + lambda.*Dyt(dy - by) + gamma.*rhsD;
@@ -191,22 +227,22 @@ for l = 1:1000
         imagesc(real(u))
         
         subplot(6,2,7);
-        plot(errors(end-length(errors)/2 : end));
+        plot(errors(end - round(length(errors)/2) : end));
         subplot(6,2,9);
-        plot(errorsr(end-length(errorsr)/2 : end-1),'r.-');
+        plot(errorsr(end - round(length(errorsr)/2) : end-1),'r.-');
 
         
         subplot(2,2,4);
-        errorfig = abs(u/norm(u) - img/norm(img));
+        errorfig = abs(u/max(u(:)) - img/max(img(:)));
         imagesc(errorfig);
         
         colormap hot;
         pause(0.01);
     
         fprintf('error (Au -f): %f \n', errors(end));
+        aviobj = addframe(aviobj,figgn);
     end
     
 end
-
-figure()
-plot(errors)
+close(figgn);
+aviobj = close(aviobj);
