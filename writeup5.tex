@@ -35,48 +35,71 @@ TODO: framelet talk, inhomogeneity talk, bregman talk (like in JF Cai's paper), 
 
 \section{Introduction}
 
-Rapid acquisition of MR images via reconstruction from undersampled $k$-space data has the potential to greatly decrease MRI scan time on existing medical hardware. 
-To this end the technique of compressed sensing has become the method choice for many researchers \cite{Lustig2007}. However, while conventional compressed sensing relies on random measurements from the image of a discrete Fourier transform, actual MR scans often suffer from off-resonance effects and thus generate data in the image of a non-Fourier operator \cite{Fessler2005}. These off-resonance effects are due to inhomogeneities in the magnetic field which must be corrected for during image reconstruction in order to avoid blurring and distortion. 
+Rapid acquisition of MR images via reconstruction from undersampled $k$-space data has the potential to greatly decrease MRI scan time on existing medical hardware. To this end iterative image reconstrction based on the technique of compressed sensing has become the method choice for many researchers \cite{Lustig2007}. However, while conventional compressed sensing relies on random measurements from the discrete Fourier transform of our image, actual MR scans often suffer from off-resonance effects and thus generate data by way of a non-Fourier operator, complicating image reconstruction methods and introducing additional computational bottlenecks \cite{Fessler2005}.
 
-Creating an MR image requires that we solve for the proton density map, $\rho(\mathbf{r})$, in the signal equation
+Our model of MR image creation requires that we solve for the proton density map, $\rho(\mathbf{r})$, in the signal equation
 
 \begin{equation}\label{sigeq}
-s(t) = \int_{\mathbb{R}^2}c(\mathbf{r})\rho(\mathbf{r})e^{-z(\mathbf{r})t}e^{-2\pi i \mathbf{k}(t) \cdot \mathbf{r} d\mathbf{r} + \epsilon
+s(t) = \int_{\mathbb{R}^2} \rho(\mathbf{r})e^{-z(\mathbf{r})t}e^{-2\pi i \mathbf{k}(t) \cdot \mathbf{r}} d\mathbf{r} + \epsilon
 \end{equation}
-
-where $s(t)$ is the recorded signal, $z(\mathbf{r})$ contains information about relaxation and off-resonance effects, $\epsilon$ is receiver noise, and the $k$-space coordinates $\mathbf{k}(t)$ typically known only on a nonuniform and possibly undersampled grid. Discretizing (\ref{sigeq}) in space and collecting multiple samples in $k$-space leads to the linear system
+where $s(t)$ is the recorded signal, $z(\mathbf{r})$ contains information about relaxation and off-resonance effects, the $k$-space coordinates $\mathbf{k}(t)$ are known only on a nonuniform and possibly undersampled grid and $\epsilon$ is receiver noise. Discretizing the physical space integral in (\ref{sigeq}) at $n$ points and collecting $m$ samples in $k$-space leads to the $m \times n$ linear system
 
 \begin{equation}\label{dissigeq}
 \vec{s} = A \vec{\rho} + \vec{\epsilon}
 \end{equation}
-
 with sample matrix
 \begin{equation}
-A_{ij} = e^{-z(\mathbf{r}_j)t_i}e^{-2\pi i \mathbf{k}(t_i) \cdot \mathbf{r}_j.
+A_{ij} = e^{-z(\mathbf{r}_j)t_i}e^{-2\pi i \mathbf{k}(t_i) \cdot \mathbf{r}_j}.
 \end{equation}
 
 
-A straightforward approach to the discrete reconstruction problem (\ref{dissigeq}) is infeasible for practical image sizes. For example, in order to produce a $512 \times 512$ image the (dense) $A$ matrix takes on dimensions $512^2 \times 512^2$. Using 32-bit floating point precision results in a matrix requiring 256GB of RAM which is prohibitively large on current machines. Operator compression is thus necessary before attempting to solve the linear system.
+A straightforward approach to this discrete reconstruction problem (\ref{dissigeq}) is infeasible for practical image sizes. For example, in order to produce a $512 \times 512$ image the (dense) $A$ matrix takes on dimensions $512^2 \times 512^2$. Storing $A$ using 32-bit floating point precision results in a matrix requiring 256GB of space, prohibitively large on most current machines. Operator compression is thus necessary before attempting to solve the linear system.
 
-In traditional MRI the $z(\mathbf{r})$ factor is ignored and $k$-space is completely filled on a uniform grid giving us
+Ignoring the $z(\mathbf{r})$ factor and filling $k$-space completely on a uniform grid yields
 \begin{equation}
 A = \mathcal{F}
 \end{equation}
 the discrete Fourier matrix. We may determine $\rho$ here by simply inverting a single Fourier transform.
 
-In the standard theory of compressed sensing we ignore $z(\mathbf{r})$ and downsample our Fourier matrix by multiplying by a random $m \cross n$ matrix $R_{ij} = 1 \text{ if we know } k_j \text{, } 0 \text{ else}$. Thus
+Failing to accomodate for off-resonance effects leads to blurring and image distortion unless the background field is perfectly homogenous while filling $k$-space completely increases scan time beyond what is needed for exact image reconstruction.
+
+We reduce scan time by appealing to the theory of compressed sensing and downsample our Fourier matrix by multiplication with a random $m \times n$ matrix $R_{ij} = 1 \text{ if we record } k_j \text{, } 0 \text{ else}$. Thus
 \begin{equation}
 A = R\mathcal{F}
 \end{equation}
+and we account for the missing data by taking advantage of the fact that our image is sparse in some transform domain by introducing $l1$ regularization. The canonical image reconstruction problem is then
+\begin{equation}\label{csequ}
+\underset{\rho}{\operatorname{argmax}} \: J(\rho)  \text{ subject to } R\mathcal{F} \rho = s
+\end{equation}
+where $J$ represents some form of $l1$ regularization. Perfect image reconstruction is possible as $R\mathcal{F}$ satifies the restricted isometry property.
 
-To account for the missing data one takes advantage of the fact that our image is sparse in some transform domain (eg $\nabla \rho$ is sparse) by introducing $l1$ regularization. The canonical image reconstruction problem is then
+Our model follows the work of [] [] [] taking into account the phase accural due to off-resonant frequency by approximating $A$ with a combination of nonuniform Fourier transforms. That is,
 \begin{equation}
-\text{argmin } | \nabla \rho |
+A = \sum_{l=1}^L B_l \mathcal{G} C_l 
 \end{equation}
-such that
+where $B_l$ and $C_l$ are diagonal matrices used in a rank $L$ approximation of $e^{-z(\mathbf{r})t}$ and $\mathcal{G}$ is a nonuniform discrete Fourier transform of type 2 []. While this generalized model hurts our restricted isometry constants image recovery from undersampled $k$-space is still possible when enough data is collected.
+
+The optmization we solve is
+\begin{equation}\label{gcsequ}
+\underset{\rho}{\operatorname{argmax}} \: J(\rho)  \text{ subject to } A \rho = s.
+\end{equation}
+In this work we advocate a hybrid of total vairation and framelet regularizers,
 \begin{equation}
-R\mathcal{F} \rho = s.
+J(\rho) = | \nabla \rho| + | D \rho |
 \end{equation}
+where the first term is a total vairation norm and $D$ is the discrete framelet decomposition []. As we will see, not only does this combined regularization improve image quality, it markedly decreases computational cost when compared with the standard total vairation regularizer as the subproblems we solve in our minimization become better conditioned.
+
+\section{Method}
+
+\section{Old stuff}
+
+
+using the Split Bregman method []. This iterative method gives fast image recovery as well as flexibilty with regard to choice of $J$. In this work we advocate the regl
+
+
+
+Initial research was done with $J(\rho) = | \nabla \rho|$, the Total Variation norm. Researchers have found improved image quality in this setting by combining Total Vairation with a Besov regularizer 
+$J(\rho) = | \nabla \rho| + | W \rho |$ where $W$ is the discrete Haar wavelet transform.
 
 Exact reconstruction of the image is possible from few samples as $R\mathcal{F}$ satisfies the ``restricted isometry propery'' \cite{Candes2006}. Solving the optimization can be done using only applications of $R\mathcal{F}$ which requires no storage space.
 
