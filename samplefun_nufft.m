@@ -14,6 +14,7 @@ function [ y ] = samplefun_nufft(st,B,C,x,m,n,t)
 [mn,~] = size(C{1});
 num_samples = length(B{1});
 
+
 if ~t
     assert(mn ==  length(x));
 else

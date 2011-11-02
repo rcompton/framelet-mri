@@ -1,0 +1,332 @@
+\documentclass[11pt]{amsart}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{graphicx}
+\usepackage{algorithmic}
+\usepackage{multicol}
+
+
+\newcommand{\R}{\mathbb{R}}
+
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{lem}[thm]{Lemma}
+
+\theoremstyle{remark}
+\newtheorem{rem}{Remark}
+\newtheorem{defn}{Definition}
+
+
+\title{TV-Framelet regularization for MRI reconstruction in the
+presence of field inhomogenities.}
+\author{Ryan Compton}
+\date{October 26, 2010}
+
+
+\begin{document}
+
+\begin{abstract}
+
+TODO: framelet talk, inhomogeneity talk, bregman talk (like in JF Cai's paper), compare with TV? Why is TV sucking?ahha! The framelet term improves the condition number of the pcg! ha! yep. that's the main reason to do this. dang.
+
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+
+Rapid acquisition of MR images via reconstruction from undersampled $k$-space data has the potential to greatly decrease MRI scan time on existing medical hardware. 
+To this end the technique of compressed sensing has become the method choice for many researchers \cite{Lustig2007}. However, while conventional compressed sensing relies on random measurements from the image of a discrete Fourier transform, actual MR scans often suffer from off-resonance effects and thus generate data in the image of a non-Fourier operator \cite{Fessler2005}. These off-resonance effects are due to inhomogeneities in the magnetic field which must be corrected for during image reconstruction in order to avoid blurring and distortion. 
+
+Creating an MR image requires that we solve for the proton density map, $\rho(\mathbf{r})$, in the signal equation
+
+\begin{equation}\label{sigeq}
+s(t) = \int_{\mathbb{R}^2}c(\mathbf{r})\rho(\mathbf{r})e^{-z(\mathbf{r})t}e^{-2\pi i \mathbf{k}(t) \cdot \mathbf{r} d\mathbf{r} + \epsilon
+\end{equation}
+
+where $s(t)$ is the recorded signal, $z(\mathbf{r})$ contains information about relaxation and off-resonance effects, $\epsilon$ is receiver noise, and the $k$-space coordinates $\mathbf{k}(t)$ typically known only on a nonuniform and possibly undersampled grid. Discretizing (\ref{sigeq}) in space and collecting multiple samples in $k$-space leads to the linear system
+
+\begin{equation}\label{dissigeq}
+\vec{s} = A \vec{\rho} + \vec{\epsilon}
+\end{equation}
+
+with sample matrix
+\begin{equation}
+A_{ij} = e^{-z(\mathbf{r}_j)t_i}e^{-2\pi i \mathbf{k}(t_i) \cdot \mathbf{r}_j.
+\end{equation}
+
+
+A straightforward approach to the discrete reconstruction problem (\ref{dissigeq}) is infeasible for practical image sizes. For example, in order to produce a $512 \times 512$ image the (dense) $A$ matrix takes on dimensions $512^2 \times 512^2$. Using 32-bit floating point precision results in a matrix requiring 256GB of RAM which is prohibitively large on current machines. Operator compression is thus necessary before attempting to solve the linear system.
+
+In traditional MRI the $z(\mathbf{r})$ factor is ignored and $k$-space is completely filled on a uniform grid giving us
+\begin{equation}
+A = \mathcal{F}
+\end{equation}
+the discrete Fourier matrix. We may determine $\rho$ here by simply inverting a single Fourier transform.
+
+In the standard theory of compressed sensing we ignore $z(\mathbf{r})$ and downsample our Fourier matrix by multiplying by a random $m \cross n$ matrix $R_{ij} = 1 \text{ if we know } k_j \text{, } 0 \text{ else}$. Thus
+\begin{equation}
+A = R\mathcal{F}
+\end{equation}
+
+To account for the missing data one takes advantage of the fact that our image is sparse in some transform domain (eg $\nabla \rho$ is sparse) by introducing $l1$ regularization. The canonical image reconstruction problem is then
+\begin{equation}
+\text{argmin } | \nabla \rho |
+\end{equation}
+such that
+\begin{equation}
+R\mathcal{F} \rho = s.
+\end{equation}
+
+Exact reconstruction of the image is possible from few samples as $R\mathcal{F}$ satisfies the ``restricted isometry propery'' \cite{Candes2006}. Solving the optimization can be done using only applications of $R\mathcal{F}$ which requires no storage space.
+
+Varying our transform domain may result in improved image quality. Aside from the tradional least squares approach, regularizations based on, wavelets \cite{Lustig2007} and nonlocal TV have already been proposed. 
+ 
+
+
+
+
+
+
+
+Efficient methods for fast application of the Fourier integral operator with general $\phi(\mathbf{r},t)$ are an area of active research \cite{Cand2006}. 
+
+
+\section{Theory}
+
+Standard clinical MRI scanners produce a powerful (1.5-3 T) static background field, $\mathbf{\hat{B}}_0(\mathbf{r})$,
+to induce a net magnetization, $\mathbf{M(\mathbf{r})}$, on the sample being imaged.
+
+Within a few seconds $\mathbf{M}(\mathbf{r})$ aligns in equilibrium with
+the background field $\mathbf{\hat{B}}_0(\mathbf{r})$. In equilbrium the
+magnitude of the net magnetization is dependent on the substance being
+imaged and is proportional to $B_0$ and the local density of protons, $\mathbf{\rho}(\mathbf{r})$.
+
+
+To spatially encode data gradient coils produce weak (450 gauss vs the
+15,000 gauss background field) time varying magnetic fields
+$\mathbf{B}_G(\mathbf{r},t)$ which are added to
+$\mathbf{B}_0(\mathbf{r})$. These fields are designed to tip
+$\mathbf{M}$ into the plane perpendicular to the level sets of
+$\mathbf{\hat{B_0}}$. Traditional scanners produce a static field along
+the $z$ direction only, $\mathbf{\hat{B}}_0(\mathbf{r}) =
+B_0(\mathbf{r})\mathbf{z}$ allowing us to select slices with
+constant $z$ and image within a slice by tipping
+$\mathbf{M}$ into the $xy$-plane.
+
+
+In the high field regime \cite{Kelso2009} we neglect concomitant fields and project the components of the gradient fields along $\mathbf{z}$ so our encoding field becomes
+\begin{equation}
+\mathbf{B}(\mathbf{r},t) = \mathbf{\hat{B}}_0 + \mathbf{B_G}(\mathbf{r},t)\cdot \mathbf{\hat{B}}_0 \frac{\mathbf{\hat{B}}_0}{||\mathbf{\hat{B}}_0||^2}
+\end{equation}
+
+
+In a traditional MR scanner, the gradient fields depend linearly with position in each slice:
+\begin{equation}
+\mathbf{B}(\mathbf{r},t) = \mathbf{\hat{B}}_0(\mathbf{r}) + (x,y,z)\cdot(G_x(t),G_y(t),G_z(t))\mathbf{z}
+\end{equation}
+
+
+The frequency of precession is governed by the Larmor equation
+\begin{equation}
+\omega(\mathbf{r},t) = \gamma B_z(\mathbf{r},t)
+\end{equation}
+
+Describing the magnetic field in the transverse plane as $M(\mathbf{r},t) = M_x + M_yi$ we model the time evolution of each voxel as
+\begin{equation}
+M(\mathbf{r},t) = M(\mathbf{r},0) e^{-t/T_2(r)}e^{-i\int_0^t(\omega(\mathbf{r},t')dt'}
+\end{equation} 
+where the $T_2(\mathbf{r})$ relaxation factor accounts for the loss of net magnetization due to the samples magnetic field and $\omega(\mathbf{r},t) = \gamma \mathbf{B}(\mathbf{r},t)$.
+
+
+Making use of Faraday's Law in a receiver coil yields the signal equation
+
+\begin{equation}\label{sigeq}
+s(t) = \int_{\mathbb{R}^2}c(\mathbf{r})\rho(\mathbf{r})e^{-t/T_2(r)}e^{-i\phi(\mathbf{r},t)}d\mathbf{r}
+\end{equation}
+
+where $c(\mathbf{r})$ is the response pattern of the receiver coil, $\rho(\mathbf{r}) = M(\mathbf{r},0)$ is the proton density map, and $\phi(\mathbf{r},t) = \int_0^t \omega(\mathbf{r},t') - \omega_0 dt'$. The constant $\omega_0$ provides demodulation around the center frequency.
+
+
+The goal of MR image reconstruction is to solve for $\rho(\mathbf{r})$ in (\ref{sigeq}).
+
+
+
+Discretizing (\ref{sigeq}) and row major flattening the 2d arrays yields the linear system
+
+\begin{equation}\label{dissigeq}
+\vec{s} = A \vec{\rho} + \vec{\epsilon}
+\end{equation}
+
+\begin{equation}
+A_{ij} = c(\mathbf{r}_j)e^{-t_i/T_2(\mathbf{r}_j)}e^{-i\phi(\mathbf{r}_j,t_i)}
+\end{equation}
+
+where $\vec{\epsilon}$ accounts for receiver noise.
+
+
+The discrete reconstruction problem (\ref{dissigeq}) is often underdetermined, nonuniformly sampled in $k$-space, and very large. For a $512 \times 512$ image the (dense) $A$ matrix takes on dimensions $512^2 \times 512^2$. Using 32-bit floating point precision results in a matrix requiring 256GB of RAM.
+
+Operator compression is thus neccessary before one may invert the linear system. Efficient
+methods for fast application of the Fourier integral operator with
+general $\phi(\mathbf{r},t)$ are an area of active research \cite{Cand2006}. 
+
+When given uniformity along $\mathbf{z}$ in the background field we write
+\begin{equation}
+\mathbf{B}(\mathbf{r},t) = (B_0 + \Delta B_0(\mathbf{r}) + \mathbf{G}(t)\cdot \mathbf(r))\mathbf{z}
+\end{equation}
+to obtain
+\begin{equation}
+e^{-i\phi(\mathbf{r},t)} = e^{-i\Delta \omega_0(\mathbf{r})t}e^{-i2\pi \mathbf{k}(t)\cdot \mathbf{r}}
+\end{equation}
+
+where $\mathbf{k}(t) = \frac{1}{2\pi}\int_0^t \mathbf{G}(t')dt'$. Higher
+order terms in $k$-space are very recently being considered \cite{Wilm2011}.
+
+With this simplification our signal model now differs from a standard
+FFT only in the phase accrual due to off resonance frequency,
+$e^{-i\Delta \omega_0(\mathbf{r})t}$. Explicitly dealing with this
+factor
+still results in an unfeasibly large system matrix. However standard low rank approximations of the form
+\begin{equation}
+e^{-i\Delta \omega_0(\mathbf{r_j})t_i} = \sum_{l=1}^L b_{il}c_{lj}
+\end{equation}
+accurately caputure the field map while providing a fast algorithm for
+the application of $A$.
+
+\begin{center}
+\begin{figure}
+\includegraphics[width=3in]{svd_decay_image.eps}
+\caption{Singular value decay for a field map dervied from a $32\times 32$ image. Images tend to be approximately piecewise constant resulting in a rapid decay of the singular values.}
+\end{figure}
+\end{center}
+
+
+\begin{center}
+\begin{figure}
+\includegraphics[width=3in]{const_decay.eps}
+\caption{Decay of the singular values for another image.}
+\end{figure}
+\end{center}
+
+We have at our disposal many methods of approximation to the off
+resonance correction. Time segmentation \cite{Sutton2003} selects a subset of points, $\{ \hat{t}_l \} \in [0,T]$ and interpolates about an optimal rate map value
+\begin{equation}
+b_{il} = b_l(t_i)e^{-\overline{\omega}t_i}
+\end{equation}
+
+\begin{equation}
+c_{lj} = e^{-(\omega_j - \overline{\omega}t_i)\hat{t}_l}
+\end{equation}
+
+Frequency segmentation \cite{Man} selects a subset of frequencies to evaluate the exponential at and interpolates the rest.
+\begin{equation}
+b_{il} = e^{-\hat{\omega}_l(t_i - \overline{t})}
+\end{equation}
+\begin{equation}
+c_{lj} = c_l(\omega_j) e^{-\omega_j\overline{t}}
+\end{equation}
+
+Standard low rank approximation methods (e.g. PCA \cite{Rokhlin},
+randomized ID \cite{Liberty2007}) are also possible. These will produce
+more accurate approximations to the off resonance factor at a
+significant computational expense. In this work we favor the time
+segmentation approach as it provides acceleration in our later
+optimzations.
+
+With this approximation our signal model becomes
+\begin{eqnarray}\label{systemsum}
+\mathbf{s} &=& A\mathbf{\rho} + \mathbf{\epsilon}\\
+&=& (\sum_{l=1}^L \text{diag} (b_{il}) R\mathcal{F} \text{diag} (c_{lj}) )\mathbf{\rho}
+\end{eqnarray}
+a combination of operators satisfying the RIP.
+
+Each term in the sum (\ref{systemsum}) has poor isometric properties as
+can be seen by examiningt
+\begin{eqnarray}
+||B_l R\mathcal{F} C_l\mathbf{x}||_2 & \leq & ||B_l|| ||R\mathcal{F} C_l
+\mathbf{x}||_2 \\
+& \leq & \max_i(b_{il}) (1+\delta_{R\mathcal{F}})\max_j(c_{lj})||\mathbf{x}||_2
+\end{eqnarray}
+where $\delta_{R\mathcal{F}}$ is the restricted isometry constant for
+the undersampled fourier operator. A similiar argument on the lower
+bound yields
+\begin{equation}
+\delta_{B_lAC_l} \leq \min( 1-\min_i(b_{il})\min_j(c_{lj}) +
+\min_i(b_{il})\min_j(c_{lj})\delta_{R\mathcal{F}}, 1-\max_i(b_{il})\max_j(c_{lj}) +
+\max_i(b_{il})\max_j(c_{lj})\delta_{R\mathcal{F}}).
+\end{equation}
+
+While $\delta_{R\mathcal{F}}$ is small ($\approx 0.1$) \cite{Candes2006}
+the values in $B_l$ and $C_l$ may be large depending on the field map.
+Futhermore, by the triangle inequality, the RIP constant for the
+complete approximation is bounded by the sum of RIP constants for each
+term resulting in an encoding scheme with poor compressed sensing
+opportunities.
+
+\begin{figure}
+\includegraphics{allblack.eps}
+\end{figure}
+
+\begin{figure}
+\includegraphics{moreblack.eps}
+\end{figure}
+
+\begin{figure}
+\includegraphics{mehblack.eps}
+\end{figure}
+
+
+\begin{figure}
+\includegraphics{blackwhite.eps}
+\end{figure}
+
+
+When restricting to rank one approximations only model retains the
+same RIP properties as $R\matcal{F}$.
+
+In practive the signal equation is often underdetermined neccistiating the use of
+regularizers for stable image recovery. Initial work focused on $l2$
+regularization of $\nabla \rho$. While computationally efficient, $l2$
+regularization in this setting has a tendency to blur edges and
+introduce non-physical artifacts as the problem becomes underdetermined.
+
+We instead recover the image by optimizing
+\begin{equation}
+\text{argmin} |\nabla \mathbf{\rho}|_1 \text{ s.t. } A\mathbf{\rho} +
+\epsilon = \mathbf{s}.
+\end{equation}
+
+This may be solved exactly and efficiently via the Split Bregman
+algorithm. The split formulation of the unconstrained step becomes
+\begin{eqnarray}\label{sb}
+\mathbf{\rho}^{k+1} &=& \min_\rho \frac{\mu}{2}||A\mathbf{\rho} - \mathbf{s}||^2 +\\
+&& \frac{\lambda}{2}||\mathbf{d}_x^k - \nabla_x\rho - \mathbf{b}_x^k||^2 +  \frac{\lambda}{2}||\mathbf{d}_x^k - \nabla_x\rho - \mathbf{b}_x^k||^2 \\
+\mathbf{d}_x^{k+1} &=& shrink(\nabla_x \mathbf{\rho}^{k+1} + \mathbf{b}_x^k, 1/\lambda)\\
+\mathbf{d}_y^{k+1} &=& shrink(\nabla_y \mathbf{\rho}^{k+1} + \mathbf{b}_y^k, 1/\lambda)\\
+\mathbf{b}_x^{k+1} &=& \mathbf{b}_x^{k} + (\nabla_x \mathbf{\rho}^{k+1} - \mathbf{d}_x^{k+1}) \\
+\mathbf{b}_y^{k+1} &=& \mathbf{b}_y^{k} + (\nabla_y \mathbf{\rho}^{k+1} - \mathbf{d}_y^{k+1})
+\end{eqnarray}
+
+
+Minimization of $\mathbf{\rho}$ in (\ref{sb}) is by far the most time
+consuming part of the iteration. When the system matrix is
+$R\mathcal{F}$ we may exactly solve the minimization with two fourier
+transforms as is done in the original Split Bregman paper.
+
+As the model with inhomogenity correction is more sophisiticated we must  iteratively approximately solve the linear system
+\begin{equation}\label{toep}
+(A^TA + \lambda \triangle)\mathbf{\rho}^{k+1} = rhs^{k}.
+\end{equation}
+
+This $l2$ optimization is effectivly handled by the iterative Toeplitz
+approach.
+
+
+
+
+
+\bibliographystyle{plain}
+\bibliography{thebib}
+
+\end{document}
