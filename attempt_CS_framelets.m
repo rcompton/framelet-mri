@@ -26,7 +26,7 @@ img = imresize(img,[n n]);
 m=n;
 
 %number of sample for compressed sense
-num_samples = round(m*n/2.5);
+num_samples = round(m*n/3);
 
 %the downsample operator matrix, could be done away with now that I have
 %nufft library but it works and was easy
@@ -43,8 +43,28 @@ scale = sqrt(m*n);
 k1pts = reshape(k1pts,numel(k1pts),1)*2*pi/m;
 k2pts = reshape(k2pts,numel(k2pts),1)*2*pi/n;
 omega = [k1pts k2pts];
-omega = omega(sort(randsample(stream, 1:max(size(omega)),num_samples)),:);
- 
+
+%bias towards low frequency samples (sucks)
+%samp_coords = zeros(1,m*n);
+%j=1;
+%i=m*n-1;
+%while(j<=num_samples && i>1)
+%    y = rand();
+%    if y > i/(m*n)
+%        samp_coords(i) = i;
+%        j = j+1;
+%    end
+%    i = i-1;
+%end
+%samp_coords = find(samp_coords);
+
+%uniformly sample
+samp_coords = sort(randsample(stream, 1:max(size(omega)),num_samples));
+
+omega = omega(samp_coords,:);
+
+%%
+
 %the number of neighbors to use when interpolating
 j1 = 11;
 j2 = 11;
@@ -187,15 +207,20 @@ errors = [0];
 subplot(2,2,1);
 imagesc(img);colormap hot;
 subplot(2,2,2);
+
+iters = [];
+
+%start the optimization outer loop is constraint enforcement
 for ell = 1:100
     %unconstrained
-    for k=1:1
+    for k=1:2
         %update u
         rhsD = FraRecMultiLevel(SubFrameletArray(dw,bw),Dt,n_level);
         rhs = mu.*unvec(At(vec(fl)),m,n) + lambda.*Dxt(dx - bx) + lambda.*Dyt(dy - by) + gamma.*rhsD;
         
         %this is where everything sucks.
         [u,flag,reles,iter] = pcg(AtA,vec(rhs),1e-3,2);
+        iters = [iters iter];
         
         if randi(5)==randi(5)
             fprintf('                                 pcg error: %d, iter: %i \n', [reles iter]);
