@@ -26,7 +26,7 @@ img = imresize(img,[n n]);
 m=n;
 
 %number of sample for compressed sense
-num_samples = round(m*n/3);
+num_samples = round(m*n/2.5);
 
 %the downsample operator matrix, could be done away with now that I have
 %nufft library but it works and was easy
@@ -83,61 +83,71 @@ scale_factor = sqrt(num_samples);
 %input vectors and output vectors as needed by pcg. Note that the output of
 %nufft_adj has m*n elements but nufft outputs num_samples x 1 column vecotr
 
+%% B,C creation part
+
+%!!!!!!!!!!!!!!!!!!!
 % do nothing correction
-% L = 6;
-% B = cell(1,L);
-% for i=1:L
-%     B{i} = randn(num_samples,1)/sqrt(L);
-% end
-% C = cell(1,L);
-% for i=1:L
-%     C{i} = randn(m*n,1)/sqrt(L);
-% end
-
-%Create B and C, this is a solved research problem and I'm not going to
-%bother with making a better interpolator
-L = 3;
-T = .2;
-mt = num_samples;
-t = linspace(0.1,T,mt); %number of time points in the time discreization of continuous time
-tl = linspace(0.1,T,L); %number of time points in to approximate at
-
-%load the other guys field map
-load fmap_test.mat
-fmap = imresize(fmap,size(img));
-
-w = fmap/norm(fmap);
-%w = peaks(n)/norm(peaks(n));
-%w = img./norm(img(:));
-
-
-C = cell(1,L);
-for l=1:L
-    C{l} = vec(exp(1j*w*tl(l)));
-end
-
+L = 1;
 B = cell(1,L);
-for l=1:L
-    B{l} = zeros(num_samples,1);
+for i=1:L
+     B{i} = ones(num_samples,1)/sqrt(L);
 end
-for l=1:L-1
-     for i=1:num_samples
-         if (tl(l) <= t(i)) && (t(i) <= tl(l+1))
-             %B(i,(l-1)*N+1:l*N) = 1 - (t(i) - tl(l))/(tl(l+1) - tl(l));
-             %B(i,l+1) = (t(i) - tl(l))/(tl(l+1) - tl(l));
-             
-             B{l}(i) = 1 - (t(i) - tl(l))/(tl(l+1) - tl(l));
-             B{l+1}(i) = (t(i) - tl(l))/(tl(l+1) - tl(l));
-         end
-     end
+C = cell(1,L);
+for i=1:L
+     C{i} = ones(m*n,1)/sqrt(L);
 end
 
- %create sample operators
+
+% % actual good way...
+% %Create B and C, this is a solved research problem and I'm not going to
+% %bother with making a better interpolator
+% L = 3;
+% T = .2;
+% mt = num_samples;
+% t = linspace(0.1,T,mt); %number of time points in the time discreization of continuous time
+% tl = linspace(0.1,T,L); %number of time points in to approximate at
+% 
+% %load the other guys field map
+% load fmap_test.mat
+% fmap = imresize(fmap,size(img));
+% fmap = rot90(fmap,-1);
+% 
+% w = fmap/norm(fmap(:));
+% %w = peaks(n)/norm(peaks(n));
+% %w = img./norm(img(:));
+% 
+% 
+% C = cell(1,L);
+% for l=1:L
+%     C{l} = vec(exp(1j*w*tl(l)));
+% end
+% 
+% B = cell(1,L);
+% for l=1:L
+%     B{l} = zeros(num_samples,1);
+% end
+% for l=1:L-1
+%      for i=1:num_samples
+%          if (tl(l) <= t(i)) && (t(i) <= tl(l+1))
+%              %B(i,(l-1)*N+1:l*N) = 1 - (t(i) - tl(l))/(tl(l+1) - tl(l));
+%              %B(i,l+1) = (t(i) - tl(l))/(tl(l+1) - tl(l));
+%              
+%              B{l}(i) = 1 - (t(i) - tl(l))/(tl(l+1) - tl(l));
+%              B{l+1}(i) = (t(i) - tl(l))/(tl(l+1) - tl(l));
+%          end
+%      end
+% end
+
+%create sample operators
 A = @(x) samplefun_nufft(st,B,C,x,m,n,0);
 At = @(x) samplefun_nufft(st,B,C,x,m,n,1);
 
+%% Now that we have an operator, sample the data in k space
+
 %create sample data
 f = A(vec(img));
+
+
 
 %not sure why Tom did this
 normFactor = 1/norm(f(:)/size(R==1,1));
@@ -159,9 +169,11 @@ exci = 1;
 %mu is the exterior constraint split
 %gamma is the framelet split
 %lambda is the TV split
-%I think they all be .5
+%picking the right parameters is difficult! For TV only I find I need
+%lambda<mu or it won't work. With a framelet term I want that gamma big for
+%the same lambda/mu. Probably should put a loop or something
 mu = 1;
-lambda = 1;
+lambda = .5;
 gamma = 5;
 
 if nu == 0
@@ -211,9 +223,9 @@ subplot(2,2,2);
 iters = [];
 
 %start the optimization outer loop is constraint enforcement
-for ell = 1:100
+for ell = 1:150
     %unconstrained
-    for k=1:2
+    for k=1:5
         %update u
         rhsD = FraRecMultiLevel(SubFrameletArray(dw,bw),Dt,n_level);
         rhs = mu.*unvec(At(vec(fl)),m,n) + lambda.*Dxt(dx - bx) + lambda.*Dyt(dy - by) + gamma.*rhsD;

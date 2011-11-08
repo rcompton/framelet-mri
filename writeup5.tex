@@ -235,7 +235,7 @@ A major advantage of our hybrid regularizer is now apparent. Consider the system
 \begin{equation}\label{tvonly}
 (\mu A^tA - \lambda \triangle)\rho^{k+1} = rhs^k.
 \end{equation}
-With $\lambda_{\max}$ and $\lambda_{\min}$ denoting maximal and minimal eigenvalues we can write the condition number of the matrix in (\ref{tvonly}) as
+Denoting maximal and minimal eigenvalues of the matrix in (\ref{tvonly}) by $\lambda_{\max}$ and $\lambda_{\min}$ we can write the condition number of our system as
 \begin{equation}
 \kappa = \frac{\lambda_{\max}}{\lambda_{\min}}.
 \end{equation}
@@ -249,6 +249,7 @@ notably speeding our updates.
 \section{Numerical Results}
 
 Our field corrected reconstruction method is compared against three alternate approaches: standard nonuniform fft, $l2$ regularized CG iterations [], and total vairation regularization [].
+
 
 
 
