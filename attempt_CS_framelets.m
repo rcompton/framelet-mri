@@ -14,19 +14,19 @@ vec = inline('reshape(x,[numel(x) 1])','x');
 unvec = inline('reshape(x,[m n])','x','m','n');
 
 %img = double(rgb2gray(imread('bouchard_mri_clean.png')));
-img = double(imread('phantom.gif'));
-%load mri;
-%img = double(D(:,:,1,21));
+%img = double(imread('phantom.gif'));
+load mri;
+img = double(D(:,:,1,19));
 %img = double(rgb2gray(imread('cleanbrain.png')));
 %img = double(imread('brainweb_t1.jpg'));
 
 %resize to a nice square
-n = 64;
+n = 128;
 img = imresize(img,[n n]);
 m=n;
 
 %number of sample for compressed sense
-num_samples = round(m*n/2.5);
+num_samples = round(m*n/1.5);
 
 %the downsample operator matrix, could be done away with now that I have
 %nufft library but it works and was easy
@@ -36,7 +36,7 @@ R(randsample(stream, 1:m*n, num_samples)) = 1.0;
 %normalizations are never consistent...
 scale = sqrt(m*n);
 
- 
+
 %using nufft
 %define the freq data locations
 [k1pts k2pts] = meshgrid(1:m, 1:n);
@@ -85,58 +85,44 @@ scale_factor = sqrt(num_samples);
 
 %% B,C creation part
 
-%!!!!!!!!!!!!!!!!!!!
-% do nothing correction
-L = 1;
-B = cell(1,L);
-for i=1:L
-     B{i} = ones(num_samples,1)/sqrt(L);
-end
+%Create B and C, this is a solved research problem and I'm not going to
+%bother with making a better interpolator
+L = 3;
+T = .2;
+mt = num_samples;
+t = linspace(0.1,T,mt); %number of time points in the time discreization of continuous time
+tl = linspace(0.1,T,L); %number of time points in to approximate at
+
+%load the other guys field map
+load fmap_test.mat
+fmap = imresize(fmap,size(img));
+fmap = rot90(fmap,-1);
+
+w = fmap/norm(fmap(:));
+%w = peaks(n)/norm(peaks(n));
+%w = img./norm(img(:));
+
+
 C = cell(1,L);
-for i=1:L
-     C{i} = ones(m*n,1)/sqrt(L);
+for l=1:L
+    C{l} = vec(exp(1j*w*tl(l)));
 end
 
-
-% % actual good way...
-% %Create B and C, this is a solved research problem and I'm not going to
-% %bother with making a better interpolator
-% L = 3;
-% T = .2;
-% mt = num_samples;
-% t = linspace(0.1,T,mt); %number of time points in the time discreization of continuous time
-% tl = linspace(0.1,T,L); %number of time points in to approximate at
-% 
-% %load the other guys field map
-% load fmap_test.mat
-% fmap = imresize(fmap,size(img));
-% fmap = rot90(fmap,-1);
-% 
-% w = fmap/norm(fmap(:));
-% %w = peaks(n)/norm(peaks(n));
-% %w = img./norm(img(:));
-% 
-% 
-% C = cell(1,L);
-% for l=1:L
-%     C{l} = vec(exp(1j*w*tl(l)));
-% end
-% 
-% B = cell(1,L);
-% for l=1:L
-%     B{l} = zeros(num_samples,1);
-% end
-% for l=1:L-1
-%      for i=1:num_samples
-%          if (tl(l) <= t(i)) && (t(i) <= tl(l+1))
-%              %B(i,(l-1)*N+1:l*N) = 1 - (t(i) - tl(l))/(tl(l+1) - tl(l));
-%              %B(i,l+1) = (t(i) - tl(l))/(tl(l+1) - tl(l));
-%              
-%              B{l}(i) = 1 - (t(i) - tl(l))/(tl(l+1) - tl(l));
-%              B{l+1}(i) = (t(i) - tl(l))/(tl(l+1) - tl(l));
-%          end
-%      end
-% end
+B = cell(1,L);
+for l=1:L
+    B{l} = zeros(num_samples,1);
+end
+for l=1:L-1
+    for i=1:num_samples
+        if (tl(l) <= t(i)) && (t(i) <= tl(l+1))
+            %B(i,(l-1)*N+1:l*N) = 1 - (t(i) - tl(l))/(tl(l+1) - tl(l));
+            %B(i,l+1) = (t(i) - tl(l))/(tl(l+1) - tl(l));
+            
+            B{l}(i) = 1 - (t(i) - tl(l))/(tl(l+1) - tl(l));
+            B{l+1}(i) = (t(i) - tl(l))/(tl(l+1) - tl(l));
+        end
+    end
+end
 
 %create sample operators
 A = @(x) samplefun_nufft(st,B,C,x,m,n,0);
@@ -146,8 +132,6 @@ At = @(x) samplefun_nufft(st,B,C,x,m,n,1);
 
 %create sample data
 f = A(vec(img));
-
-
 
 %not sure why Tom did this
 normFactor = 1/norm(f(:)/size(R==1,1));
@@ -163,8 +147,17 @@ n_level = 1;
 
 
 %We minimize nu*|nabla u| + exci*|Du| st Au = f
-nu = 1;
+nu = 0;
 exci = 1;
+
+%% Pick the mus, lambdas and gammas.... I don't know a good way to get them
+%% right
+
+mu = 1;
+lambda = .575;
+gamma = 25;
+
+
 
 %mu is the exterior constraint split
 %gamma is the framelet split
@@ -172,9 +165,7 @@ exci = 1;
 %picking the right parameters is difficult! For TV only I find I need
 %lambda<mu or it won't work. With a framelet term I want that gamma big for
 %the same lambda/mu. Probably should put a loop or something
-mu = 1;
-lambda = .5;
-gamma = 5;
+
 
 if nu == 0
     lambda = 0;
@@ -223,15 +214,18 @@ subplot(2,2,2);
 iters = [];
 
 %start the optimization outer loop is constraint enforcement
-for ell = 1:150
+%2997 matches what happened for framelet
+ell = 0;
+while( (ell < 500) && (sum(iters)<2997))
+    ell = ell+1;
     %unconstrained
-    for k=1:5
+    for k=1:3
         %update u
         rhsD = FraRecMultiLevel(SubFrameletArray(dw,bw),Dt,n_level);
         rhs = mu.*unvec(At(vec(fl)),m,n) + lambda.*Dxt(dx - bx) + lambda.*Dyt(dy - by) + gamma.*rhsD;
         
         %this is where everything sucks.
-        [u,flag,reles,iter] = pcg(AtA,vec(rhs),1e-3,2);
+        [u,flag,reles,iter] = pcg(AtA,vec(rhs),1e-3);
         iters = [iters iter];
         
         if randi(5)==randi(5)
@@ -261,19 +255,21 @@ for ell = 1:150
     
     errorsr = [errorsr norm(A(vec(u)) - f,'fro')/norm(f,'fro')];
     errors = [errors norm(u/max(u(:)) - img/max(img(:)),'fro')];
-
-
+    
+    
     if randi(1)==1
         subplot(2,2,2)
         imagesc(real(u))
+        %                xlabel(namer);
+        
         
         subplot(6,2,7);
         %plot(errors(end - round(length(errors)/2) : end));
-        plot(errors);
+        semilogy(errors);
         subplot(6,2,9);
-        plot(errorsr,'r.-');
+        semilogy(errorsr,'r.-');
         %plot(errorsr(end - round(length(errorsr)/2) : end-1),'r.-');
-
+        
         
         subplot(2,2,4);
         errorfig = abs(u/max(u(:)) - img/max(img(:)));
@@ -281,7 +277,7 @@ for ell = 1:150
         
         colormap hot;
         pause(0.01);
-    
+        
         fprintf('step ell = %i error (u-img): %f \n', [ell errors(end)]);
         aviobj = addframe(aviobj,figgn);
     end
@@ -289,3 +285,18 @@ for ell = 1:150
 end
 close(figgn);
 aviobj = close(aviobj);
+
+%         close all;
+%         figure()
+%         imagesc(abs(u));
+%         xlabel(namer);
+%         save(namer);
+%         bigdatonparameters = [bigdatonparameters; mu lambda gamma errors(end) errorsr(end) sum(iters)];
+%     end
+% end
+%
+% close all;
+%
+% %
+% scatter3(bigdatonparameters(:,1),bigdatonparameters(:,2), bigdatonparameters(:,4));
+% xlabel('mu');ylabel('lambda');zlabel('errors');

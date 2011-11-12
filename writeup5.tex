@@ -9,6 +9,19 @@
 
 \usepackage{multicol}
 
+\usepackage{breqn}
+
+%make things fit on less pages:
+\usepackage{times}
+\usepackage{fullpage}
+\usepackage[small,it]{caption}
+%\usepackage{savetrees}
+%\usepackage[small,compact]{titlesec}
+\usepackage{setspace}
+%\addtolength{\belowcaptionskip}{-5mm}
+\addtolength{\intextsep}{-5mm}
+
+
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\Z}{\mathbb{Z}}
 
@@ -20,17 +33,17 @@
 \newtheorem{defn}{Definition}
 
 
-\title{TV-Framelet regularization for MRI reconstruction in the
-presence of field inhomogenities.}
-\author{Ryan Compton}
-\date{October 26, 2010}
+\title{Hybrid regularization for MRI reconstruction with field inhomogeneity correction}
+\author{Ryan Compton, Louis Bouchard, Stan Osher}
+\date{October 96, 2010}
 
 
 \begin{document}
 
 \begin{abstract}
+Rapid acquisition of MR images via reconstruction from undersampled $k$-space data has the potential to greatly decrease MRI scan time on existing medical hardware. To this end iterative image reconstrction based on the technique of compressed sensing has become the method choice for many researchers \cite{Lustig2007}. However, while conventional compressed sensing relies on random measurements from a discrete Fourier transform, actual MR scans often suffer from off-resonance effects and thus generate data by way of a non-Fourier operator, complicating image reconstruction methods and introducing additional computational bottlenecks \cite{Fessler2005}.
 
-Rapid acquisition of MR images via reconstruction from undersampled $k$-space data has the potential to greatly decrease MRI scan time on existing medical hardware. To this end iterative image reconstrction based on the technique of compressed sensing has become the method choice for many researchers \cite{Lustig2007}. However, while conventional compressed sensing relies on random measurements from the discrete Fourier transform of our image, actual MR scans often suffer from off-resonance effects and thus generate data by way of a non-Fourier operator, complicating image reconstruction methods and introducing additional computational bottlenecks \cite{Fessler2005}.
+In this work we introduce a combined TV-framelet regularization to the undersampled MR reconstruction problem in inhomogeneous fields. We show that the inclusion of a framelet regularization term decreases computation time and improves image quality over the traditional total variation based approach.
 
 \end{abstract}
 
@@ -39,12 +52,12 @@ Rapid acquisition of MR images via reconstruction from undersampled $k$-space da
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Introduction}
-Our model of MR image creation requires that we solve for the proton density map, $\rho(\mathbf{r})$, in the signal equation
+Our model of MR image formation is based on solving for the proton density map, $\rho(\mathbf{r})$, in the signal equation
 
 \begin{equation}\label{sigeq}
 s(t) = \int_{\mathbb{R}^2} \rho(\mathbf{r})e^{-z(\mathbf{r})t}e^{-2\pi i \mathbf{k}(t) \cdot \mathbf{r}} d\mathbf{r} + \epsilon
 \end{equation}
-where $s(t)$ is the recorded signal, $z(\mathbf{r})$ contains information about relaxation and off-resonance effects, the $k$-space coordinates $\mathbf{k}(t)$ are known only on a nonuniform and possibly undersampled grid and $\epsilon$ is receiver noise. Discretizing the physical space integral in (\ref{sigeq}) at $n$ points and collecting $m$ samples in $k$-space leads to the $m \times n$ linear system
+where $s(t)$ is the recorded signal, $z(\mathbf{r})$ contains information about relaxation and off-resonance effects, the $k$-space coordinates, $\mathbf{k}(t)$, are known only on a nonuniform and possibly undersampled grid and $\epsilon$ is receiver noise \cite{Haacke1999}. An $n$ point discretization of the physical space integral at $m$ different values of $t$ leads to the $m \times n$ linear system
 
 \begin{equation}\label{dissigeq}
 \vec{s} = A \vec{\rho} + \vec{\epsilon}
@@ -53,17 +66,27 @@ with sample matrix
 \begin{equation}\label{aij}
 A_{ij} = e^{-z(\mathbf{r}_j)t_i}e^{-2\pi i \mathbf{k}(t_i) \cdot \mathbf{r}_j}.
 \end{equation}
+The goal of MRI reconstrction is to efficiently invert the above linear system in a way that produces high quality images.
+
+Note that our system matrix, $A$, differs only from a discrete Fourier matrix in the phase accural due to off resonant frequency, $e^{-z(\mathbf{r}_j)t_i}$. In classical MRI reconstruction the background field is assumed perfectly homogenous and this factor is ignored. Recording all points in $k$-space on a uniform grid allows estimation of $\rho$ by inverting a single Fourier transform.
+
+While simple computationally, failing to accomodate for off-resonance effects leads to blurring and image distortion \cite{Lai}. This is of specific importance when imaging for surgical planning near the nasal sinuses, ears, and cerebral cortex where air-tissue interfaces exaberate static field inhomogeneities \cite{Moerland1995} \cite{Neufeld2005}.
+
+On the other hand, directing forming the system matrix is infeasible for practical image sizes. To produce a $512 \times 512$ image the (dense) $A$ matrix takes on dimensions $512^2 \times 512^2$. Storing $A$ in 32-bit floating point precision requires 256GB of space, prohibitively large on most current machines. As a result, methods of operator compression based on combinations of Fourier operators have been developed to solve the linear system (\ref{dissigeq}) \cite{Fessler2010}.
+
+Diverging further from the classical MRI reconstruction problem, we note that the theory of compressed sensing has shown that filling all of $k$-space increases scan time beyond what is needed for exact image reconstruction when off-resonance effects are ignored \cite{Romberg2007}. In this work we hope to rectify these two issues, demonstrating image recovery with a generalized operator when $k$-space is undersampled.
 
 
-A straightforward approach to this discrete reconstruction problem (\ref{dissigeq}) is infeasible for practical image sizes. For example, in order to produce a $512 \times 512$ image the (dense) $A$ matrix takes on dimensions $512^2 \times 512^2$. Storing $A$ using 32-bit floating point precision results in a matrix requiring 256GB of space, prohibitively large on most current machines. Operator compression is thus necessary before attempting to solve the linear system.
 
-Ignoring the $z(\mathbf{r})$ factor and filling $k$-space completely on a uniform grid yields
-\begin{equation}
-A = \mathcal{F}
+===============================================================
+
+Following \cite{Man} and \cite{Fessler2005}, we take $e^{-z(\mathbf{r}_j)t_i}$ into account by approximating $A$ with a combination of nonuniform Fourier transforms. That is,
+\begin{equation}\label{aprox}
+A = \sum_{l=1}^L B_l \mathcal{G} C_l 
 \end{equation}
-the discrete Fourier matrix. We may determine $\rho$ here by simply inverting a single Fourier transform.
+where $B_l$ and $C_l$ are diagonal matrices used in a rank $L$ approximation of $e^{-z(\mathbf{r})t}$ and $\mathcal{G}$ is a nonuniform discrete Fourier transform of type 2 \cite{Greengard2004}. Although direct inversion of this generalized operator is infeasible, iterative methods can reliably produce quality images \cite{Sutton2003}.
 
-Failing to accomodate for off-resonance effects leads to blurring and image distortion unless the background field is perfectly homogenous while filling $k$-space completely increases scan time beyond what is needed for exact image reconstruction.
+
 
 We reduce scan time by appealing to the theory of compressed sensing and downsample our Fourier matrix by multiplication with a random $m \times n$ matrix $R_{ij} = 1 \text{ if we record } k_j \text{, } 0 \text{ else}$. Thus
 \begin{equation}
@@ -75,11 +98,6 @@ and we account for the missing data by taking advantage of the fact that our ima
 \end{equation}
 where $J$ represents some form of $l1$ regularization. Perfect image reconstruction is possible as $R\mathcal{F}$ satifies the restricted isometry property.
 
-Our model follows the work of [] [] [] taking into account the phase accural due to off-resonant frequency by approximating $A$ with a combination of nonuniform Fourier transforms. That is,
-\begin{equation}\label{aprox}
-A = \sum_{l=1}^L B_l \mathcal{G} C_l 
-\end{equation}
-where $B_l$ and $C_l$ are diagonal matrices used in a rank $L$ approximation of $e^{-z(\mathbf{r})t}$ and $\mathcal{G}$ is a nonuniform discrete Fourier transform of type 2 []. While this generalized model hurts our restricted isometry constants image recovery from undersampled $k$-space is still possible when enough data is collected.
 
 The optmization we solve is
 \begin{equation}\label{gcsequ}
@@ -129,10 +147,10 @@ In our corrected system matrix we can infer that each term in the sum (\ref{apro
 & \leq & \max_i(b_{il}) (1+\delta_s^{R\mathcal{F}})\max_j(c_{lj})\| x \|_2
 \end{eqnarray}
 as well as the corresponding lower bound to give us a restricted isometry constant for an $L=1$ correction to our inhomogeneity
-\begin{equation}
-\delta_{B_lAC_l} \leq \min( 1-\min_i(b_{il})\min_j(c_{lj}) + \min_i(b_{il})\min_j(c_{lj})\delta_{R\mathcal{F}}, 
-1-\max_i(b_{il})\max_j(c_{lj}) + \max_i(b_{il})\max_j(c_{lj})\delta_{R\mathcal{F}}).
-\end{equation}
+\begin{dmath}
+\delta_{B_lAC_l} \leq \min( 1-\min_i(b_{il})\min_j(c_{lj}) + \min_i(b_{il})\min_j(c_{lj})\delta_{R\mathcal{F}}, \; 
+1-\max_i(b_{il})\max_j(c_{lj}) + \max_i(b_{il})\max_j(c_{lj})\delta_{R\mathcal{F}})
+\end{dmath}
 as a result more samples are required for accurate image recovery than in the pure Fourier case.
 
 
@@ -248,8 +266,64 @@ notably speeding our updates.
 
 \section{Numerical Results}
 
-Our field corrected reconstruction method is compared against three alternate approaches: standard nonuniform fft, $l2$ regularized CG iterations [], and total vairation regularization [].
+Our hybrid reconstruction method is compared against three alternate approaches: uncorrected nonuniform-FFT, field corrected total vairation regularization, and field corrected framelet regularization.
 
+The nonuniform Fourier transforms are computed with [] and 11 points of interpolation. 
+
+\begin{center}
+\begin{figure}[h!]
+\includegraphics[width=2in,height=2in]{exact_brain_128.eps}
+\includegraphics[width=2in,height=2in]{fmap.eps}
+\caption{Exact $128 \times 128$ image used for reconstruction experiments and corresponding field map. Taken from [].}
+\end{figure}
+\end{center}
+
+\begin{center}
+\begin{figure}[h!]
+\includegraphics[width=1.2in,height=1.2in]{nufft15_brain_128.eps}
+\includegraphics[width=1.2in,height=1.2in]{tvonly15_brain_128.eps}
+\includegraphics[width=1.2in,height=1.2in]{frameletonly15_brain_128.eps}
+\includegraphics[width=1.2in,height=1.2in]{tvframelet15_brain_128.eps}
+\linebreak
+\includegraphics[width=1.2in,height=1.2in]{nufft_brain_128.eps}
+\includegraphics[width=1.2in,height=1.2in]{tvonly_brain_128.eps}
+\includegraphics[width=1.2in,height=1.2in]{frameletonly_brain_128.eps}
+\includegraphics[width=1.2in,height=1.2in]{tvframelet_brain_128.eps}
+\linebreak
+\includegraphics[width=1.2in,height=1.2in]{nufft35_brain_128.eps}
+\includegraphics[width=1.2in,height=1.2in]{tvonly35_brain_128.eps}
+\includegraphics[width=1.2in,height=1.2in]{frameletonly35_brain_128.eps}
+\includegraphics[width=1.2in,height=1.2in]{tvframelet35_brain_128.eps}
+\linebreak
+\includegraphics[width=1.2in,height=1.2in]{nufft45_brain_128.eps}
+\includegraphics[width=1.2in,height=1.2in]{tvonly45_brain_128.eps}
+\includegraphics[width=1.2in,height=1.2in]{frameletonly45_brain_128.eps}
+\includegraphics[width=1.2in,height=1.2in]{tvframelet45_brain_128.eps}
+\caption{Reconstruction of brain image from 40\% $k$-space data. Clockwise from top left: nufft [] of raw data, TV regularization $\| \rho - \rho_{exact} \| = 32.0884$, framelet regularization $\| \rho - \rho_{exact} \| = 14.3459$, hybrid regularization $\| \rho - \rho_{exact} \| = 9.9995$ . All iterative methods were stopped after 2997 applications of $A$.}
+\end{figure}
+\end{center}
+
+\begin{center}
+\begin{tabular}{| p{2cm} || r | r | r | r | r | }
+  \hline
+  \multicolumn{5}{|c|}{Brain image reconstruction error: $\| \rho_{exact} - \rho \|_2$}\\
+  \hline                       
+  Downsample factor & NUFFT & TV & Framelet & Hybrid \\ \hline
+  1.5x & 1.0954e+04 & 0.3134 & 0.3134 & 0.3621 \\
+  2.5x & 1.2032e+04 & 32.0884 & 14.3459 & 9.9995 \\
+  3.5x & 1.2369e+04 & 35.0548 & 21.8537 & 18.3263 \\
+  4.5x & 1.2536e+04 & 48.4947 & 44.9358 & 43.8486 \\
+  \hline  
+\end{tabular}
+\end{center}
+
+\begin{center}
+\begin{figure}[h!]
+\includegraphics[width=2in,height=2in]{actual_errors.eps}
+\includegraphics[width=2in,height=2in]{residual_errors.eps}
+\caption{Reconstruction errors at $2.5$x undersampling. Left: Actual error ($\| \rho -\rho_{exact} \|$) vs Bregman iteration count. Right: Residual error ($\| A\rho - s \|$). Hybrid regularization in blue, framelet only in red.}
+\end{figure}
+\end{center}
 
 
 
