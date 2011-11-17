@@ -55,70 +55,41 @@ In this work we introduce a combined TV-framelet regularization to the undersamp
 Our model of MR image formation is based on solving for the proton density map, $\rho(\mathbf{r})$, in the signal equation
 
 \begin{equation}\label{sigeq}
-s(t) = \int_{\mathbb{R}^2} \rho(\mathbf{r})e^{-z(\mathbf{r})t}e^{-2\pi i \mathbf{k}(t) \cdot \mathbf{r}} d\mathbf{r} + \epsilon
+s(t) = \int_{\mathbb{R}^2} \rho(\mathbf{r})e^{-z(\mathbf{r})t}e^{-2\pi i \mathbf{k}(t) \cdot \mathbf{r}} d\mathbf{r}
 \end{equation}
-where $s(t)$ is the recorded signal, $z(\mathbf{r})$ contains information about relaxation and off-resonance effects, the $k$-space coordinates, $\mathbf{k}(t)$, are known only on a nonuniform and possibly undersampled grid and $\epsilon$ is receiver noise \cite{Haacke1999}. An $n$ point discretization of the physical space integral at $m$ different values of $t$ leads to the $m \times n$ linear system
+where $s(t)$ is the recorded signal, $z(\mathbf{r})$ contains information about relaxation and off-resonance effects, and the $k$-space coordinates, $\mathbf{k}(t)$, are known only on a nonuniform and possibly undersampled grid \cite{Haacke1999}. An $n$ point discretization of the physical space integral at $m$ different values of $t$ leads to the $m \times n$ linear system
 
 \begin{equation}\label{dissigeq}
-\vec{s} = A \vec{\rho} + \vec{\epsilon}
+\vec{s} = A \vec{\rho}
 \end{equation}
-with sample matrix
+with system matrix
 \begin{equation}\label{aij}
 A_{ij} = e^{-z(\mathbf{r}_j)t_i}e^{-2\pi i \mathbf{k}(t_i) \cdot \mathbf{r}_j}.
 \end{equation}
-The goal of MRI reconstrction is to efficiently invert the above linear system in a way that produces high quality images.
+The goal of MRI reconstruction is to efficiently invert the linear system (\ref{dissigeq}) in a way that produces high quality images.
 
-Note that our system matrix, $A$, differs only from a discrete Fourier matrix in the phase accural due to off resonant frequency, $e^{-z(\mathbf{r}_j)t_i}$. In classical MRI reconstruction the background field is assumed perfectly homogenous and this factor is ignored. Recording all points in $k$-space on a uniform grid allows estimation of $\rho$ by inverting a single Fourier transform.
+Classically, the background field is assumed perfectly homogeneous and the phase accrual due to off resonant frequency, $e^{-z(\mathbf{r}_j)t_i}$, is then ignored. Recording all points in $k$-space on a uniform grid allows estimation of $\rho$ by inverting a single Fourier transform.
 
-While simple computationally, failing to accomodate for off-resonance effects leads to blurring and image distortion \cite{Lai}. This is of specific importance when imaging for surgical planning near the nasal sinuses, ears, and cerebral cortex where air-tissue interfaces exaberate static field inhomogeneities \cite{Moerland1995} \cite{Neufeld2005}.
+While simple computationally, failing to accommodate for off-resonance effects leads to blurring and image distortion in many types of MR scans \cite{Lai}. Caused by static field inhomogeneities, these off-resonance effects manifest themselves in scans with long readout times as well as scans near air/tissue interfaces where magnetic susceptibility variations are exacerbated. This is of specific importance when imaging for surgical planning near the nasal sinuses, ears, and cerebral cortex \cite{Moerland1995} \cite{Neufeld2005}.
 
-On the other hand, directing forming the system matrix is infeasible for practical image sizes. To produce a $512 \times 512$ image the (dense) $A$ matrix takes on dimensions $512^2 \times 512^2$. Storing $A$ in 32-bit floating point precision requires 256GB of space, prohibitively large on most current machines. As a result, methods of operator compression based on combinations of Fourier operators have been developed to solve the linear system (\ref{dissigeq}) \cite{Fessler2010}.
+Conversely, directing forming $A$ is infeasible for practical image sizes. To produce a $512 \times 512$ image the (dense) $A$ matrix takes on dimensions $512^2 \times 512^2$. Storing $A$ in 32-bit floating point precision requires 256GB of space, prohibitively large on most current machines. As a result, methods of operator compression based on combinations of Fourier operators have been developed to efficient apply $A$ \cite{Fessler2010}.
 
-Diverging further from the classical MRI reconstruction problem, we note that the theory of compressed sensing has shown that filling all of $k$-space increases scan time beyond what is needed for exact image reconstruction when off-resonance effects are ignored \cite{Romberg2007}. In this work we hope to rectify these two issues, demonstrating image recovery with a generalized operator when $k$-space is undersampled.
+Once $A$ may be applied efficiently, iterative methods can be used to reliably reconstruct $\rho$ provided enough $k$-space data has been recorded \cite{Sutton2003}. However, the recently developed field of compressed sensing has shown that filling all of $k$-space increases scan time beyond what is needed for exact image reconstruction when off-resonance effects are ignored \cite{Romberg2007}.
 
-
-
-===============================================================
-
-Following \cite{Man} and \cite{Fessler2005}, we take $e^{-z(\mathbf{r}_j)t_i}$ into account by approximating $A$ with a combination of nonuniform Fourier transforms. That is,
-\begin{equation}\label{aprox}
-A = \sum_{l=1}^L B_l \mathcal{G} C_l 
-\end{equation}
-where $B_l$ and $C_l$ are diagonal matrices used in a rank $L$ approximation of $e^{-z(\mathbf{r})t}$ and $\mathcal{G}$ is a nonuniform discrete Fourier transform of type 2 \cite{Greengard2004}. Although direct inversion of this generalized operator is infeasible, iterative methods can reliably produce quality images \cite{Sutton2003}.
+In this work we hope to rectify these two issues, demonstrating a method for image recovery with a generalized operator when $k$-space is undersampled. Furthermore, we introduce to the literature a regularization term based on framelets which reduces the computational costs associated with a standard compressed sensing based reconstruction.
 
 
-
-We reduce scan time by appealing to the theory of compressed sensing and downsample our Fourier matrix by multiplication with a random $m \times n$ matrix $R_{ij} = 1 \text{ if we record } k_j \text{, } 0 \text{ else}$. Thus
-\begin{equation}
-A = R\mathcal{F}
-\end{equation}
-and we account for the missing data by taking advantage of the fact that our image is sparse in some transform domain by introducing $l1$ regularization. The canonical image reconstruction problem is then
-\begin{equation}\label{csequ}
-\underset{\rho}{\operatorname{argmax}} \: J(\rho)  \text{ subject to } R\mathcal{F} \rho = s
-\end{equation}
-where $J$ represents some form of $l1$ regularization. Perfect image reconstruction is possible as $R\mathcal{F}$ satifies the restricted isometry property.
-
-
-The optmization we solve is
-\begin{equation}\label{gcsequ}
-\underset{\rho}{\operatorname{argmax}} \: J(\rho)  \text{ subject to } A \rho = s.
-\end{equation}
-In this work we advocate a hybrid of total vairation and framelet regularizers,
-\begin{equation}
-J(\rho) = | \nabla \rho| + | D \rho |
-\end{equation}
-where the first term is a total vairation norm and $D$ is the discrete framelet decomposition []. As we will see, not only does this combined regularization improve image quality, it markedly decreases computational cost when compared with the standard total vairation regularizer as the subproblems we solve in our minimization become better conditioned.
 
 \section{Method}
 
 \subsection{Low rank inhomogeneity correction}
-The factor $e^{-z(\mathbf{r}_j)t_i}$ in (\ref{aij}) is probelmatic as $t$ is variable preventing us from absorbing the exponential into $\rho$ and working with a purely Fourier system matrix. Seperable low rank approximations allow us to rapidly apply $A$ with little storage overhead. The general form is 
+The factor $e^{-z(\mathbf{r}_j)t_i}$ in (\ref{aij}) is problematic as $t$ is variable preventing us from absorbing the exponential into $\rho$ and working with a purely Fourier system matrix. Severable low rank approximations allow us to rapidly apply $A$ with little storage overhead. The general form is 
 
 \begin{equation}
 e^{-z(\mathbf{r})t} = \sum_{l=1}^L b_{l}(t_i)c_{l}(\mathbf{r}_j)
 \end{equation}
 
-Many methods of choosing $b_l$ and $c_l$ exist [] [] [] []. The time segmentation approach \cite{Sutton2003} selects a subset of $L$ points, $\{ \hat{t}_l \} \in [0,T]$ and interpolates about an optimal rate map value, $\overline{\omega}$,
+Many methods of choosing $b_l$ and $c_l$ exist \cite{Man} \cite{Fessler2005}. The time segmentation approach \cite{Sutton2003} selects a subset of $L$ points, $\{ \hat{t}_l \} \in [0,T]$ and interpolates about an optimal rate map value, $\overline{\omega}$,
 
 \begin{equation}
 b_{il} = b_l(t_i)e^{-\overline{\omega}t_i}
@@ -130,29 +101,48 @@ c_{lj} = e^{-(z(\mathbf{r}_j) - \overline{\omega}t_i)\hat{t}_l}
 
 Application of $A$ proceeds as
 \begin{equation}
-(Ax)_i = \sum_{l=1} b_{il} \sum_{j=1}^n x_j c_{lj} e^{-2\pi i \mathbf{k}(t_i) \cdot \mathbf{r}_j}
+(Ax)_i = \sum_{l=1} b_{il} \sum_{j=1}^n x_j c_{lj} e^{-2\pi i \mathbf{k}(t_i) \cdot \mathbf{r}_j}.
 \end{equation}
-justifying the notation in equation (\ref{aprox}).
+In the notation of (\ref{dissigeq}),
+\begin{equation}\label{aprox}
+A = \sum_{l=1}^L B_l \mathcal{G} C_l 
+\end{equation}
+where $B_l$ and $C_l$ are diagonal matrices ($B_l = diag (b_{il})$, $C_l = diag (c_{lj})$) and $\mathcal{G}$ is a nonuniform discrete Fourier transform of type 2 \cite{Greengard2004}.
 
-While fast to apply, the modified system matrix obeys uncertainty properties differing from the pure Fourier case
+While fast to apply, the modified system matrix obeys uncertainty properties differing from the pure Fourier case.
 We recall the concept of a {\it restricted isometry constant}, $\delta_s^A$, of a matrix $A$ for an integer $s$ as the smallest number such that
 \begin{equation}
 (1-\delta_s^A)\|x\|_{l2}^2 \leq \|Ax\|_{l2}^2 \leq (1+\delta_s^A)\|x\|_{l2}^2
 \end{equation}
-where $s$ is the number of nonzero entries in $x$. When such a constant exists $A$ is said to satisfy the {\it restricted isometry propery} allowing us to make use of results from compressed sensing. In the case of a Fourier matrix $A = R\mathcal{F}$ much work has been devoted to showing that $\delta_s^{R\mathcal{F}}$ is small [candes icm].
+where $s$ is the number of nonzero entries in $x$. When such a constant exists $A$ is said to satisfy the {\it restricted isometry property} guaranteeing us exact image reconstruction from vastly undersampled $k$-space with overwhelmingly high probability \cite{Donoho2004}. In the case of an undersampled Fourier matrix, much work has been devoted to showing that $\delta_s^{\mathcal{G}}$ is small \cite{Candes2006} \cite{Candes.2006}.
 
-In our corrected system matrix we can infer that each term in the sum (\ref{aprox}) has poor isometric properties by examining
+In our corrected system matrix we can infer that each term in the sum (\ref{aprox}) has less than ideal isometric properties by examining
 \begin{eqnarray}
-\|B_l R\mathcal{F} C_l x \|_2 & \leq & \|B_l\| \|R\mathcal{F} C_l x\|_2 \\ 
-& \leq & \max_i(b_{il}) (1+\delta_s^{R\mathcal{F}})\max_j(c_{lj})\| x \|_2
+\|B_l \mathcal{G} C_l x \|_2 & \leq & \|B_l\| \|\mathcal{G} C_l x\|_2 \\ 
+& \leq & \max_i(b_{il}) (1+\delta_s^{\mathcal{G}})\max_j(c_{lj})\| x \|_2
 \end{eqnarray}
 as well as the corresponding lower bound to give us a restricted isometry constant for an $L=1$ correction to our inhomogeneity
 \begin{dmath}
-\delta_{B_lAC_l} \leq \min( 1-\min_i(b_{il})\min_j(c_{lj}) + \min_i(b_{il})\min_j(c_{lj})\delta_{R\mathcal{F}}, \; 
-1-\max_i(b_{il})\max_j(c_{lj}) + \max_i(b_{il})\max_j(c_{lj})\delta_{R\mathcal{F}})
+\delta_s^{B_l \mathcal{G} C_l} \leq \min( 1-\min_i(b_{il})\min_j(c_{lj}) + \min_i(b_{il})\min_j(c_{lj})\delta_s^{\mathcal{G}}, \; 
+1-\max_i(b_{il})\max_j(c_{lj}) + \max_i(b_{il})\max_j(c_{lj})\delta_s^{\mathcal{G}}).
 \end{dmath}
-as a result more samples are required for accurate image recovery than in the pure Fourier case.
+Larger values for $L$ increase the corresponding isometry constants and as a result more samples are required for accurate image recovery than in the pure Fourier case. 
 
+\subsection{Sparse recovery via $l1$ minimization}
+
+We reduce scan time by appealing to the theory of compressed sensing, downsampling our Fourier matrix uniformly at random and accounting for the missing data with sparsity promoting regularization. The canonical image reconstruction problem is then
+\begin{equation}\label{csequ}
+\underset{\rho}{\operatorname{argmax}} \: J(\rho)  \text{ subject to } A \rho = s
+\end{equation}
+where $J$ represents some form of $l1$ regularization.
+
+While MR images are not sparse in the image domain, they are sparse in an appropriately chosen transform domain \cite{Lustig2007}. Representation of images in bases of wavelets \cite{Duarte}, and by extension, framelets \cite{Daubechies2001} yield sparse collections of coefficients. Similarly, reconstruction methods based on the total variation \cite{Rudin1992} norm as well as its nonlocal counterpart \cite{Liang2009} have been shown to accurately reproduce edges from sparse frequency data.
+
+In this work we advocate a hybrid of total variation and framelet regularizers,
+\begin{equation}
+J(\rho) = | \nabla \rho| + | D \rho |
+\end{equation}
+where the first term is a total variation norm and $D$ is the discrete framelet decomposition \cite{Cai2008}. As we will see, not only does this combined regularization improve image quality, it markedly decreases computational cost when compared with a solitary total variation regularizer as the subproblems we solve in our minimization become better conditioned.
 
 \subsection{Frames and Framelets}
 
@@ -160,14 +150,13 @@ Natural images often have sparse representations within some redundant orthogona
 \begin{equation}
 f = \sum_{g \in X} \left< f,g \right> g.
 \end{equation}
-as $X$ is overcomplete the redundency often leads to improved image quality in sparse representations [].
+as $X$ is overcomplete the redundancy often leads to improved image quality in sparse representations \cite{Daubechies2001}.
 
 Recall that a wavelet system is the collection of dilations and shifts of a finite set $\Psi$
 \begin{equation}
 X(\Psi) = \left\{ 2^{k/2}\psi(2^kx-j) \: : \: \psi \in \Psi,k,j\in \Z \right\}.
 \end{equation}
-When $X(\Psi)$ is a tight frame the elements, $\psi$, are called ``framelets''. Stacking the basis elements as row vectors of a matrix $D$ we have that $D^tD = I$. However $DD^t = I$ may not hold. The decomposition $Df$ may be computed efficiently via the discrete wavelet transform. We adpot the piecewise linear B-spline framelet in this work []. More details on framelets may be found in [] [] [] [] [].
-
+When $X(\Psi)$ is a tight frame the elements, $\psi$, are called ``framelets''. Stacking the basis elements as row vectors of a matrix $D$ we have that $D^tD = I$. However $DD^t = I$ may not hold. The decomposition $Df$ may be computed efficiently via the discrete wavelet transform. We adopt the piecewise linear B-spline framelet in this work \cite{Cai2010a}. More details on framelets may be found in \cite{Caia} \cite{Daubechies2001} and \cite{Cai2010a}.
 
 \subsection{Split Bregman iterations for image recovery}
 
@@ -178,7 +167,7 @@ Our image is the solution to the constrained optmiziation
 \text{ subject to } A \rho = s
 \end{array}
 \end{align}
-which we solve with the Split Bregman method of Goldstein et al. []. We begin by converting the constrained optimization (\ref{jcseq}) into a sequence of unconstrained problems via Bregman iteration []
+which we solve with the Split Bregman method of Goldstein et al. \cite{Goldstein2009a}. We begin by converting the constrained optimization (\ref{jcseq}) into a sequence of unconstrained problems via Bregman iteration \cite{Osher} 
 \begin{align}\label{gbregman}
 \left\{
     \begin{array}{rcl}
@@ -187,9 +176,9 @@ s^{k+1} &=& s^k + s - A\rho^{k+1}
 \end{array}
 \right.
 \end{align}
-where the parameter $\mu$ affects the convergence rate and is chosen by the user. Alternatly updating $\rho^k$ and $s^k$ produces a sequence $\rho^k \rightarrow \rho$, the solution to the constrained problem.
+where the parameter $\mu$ affects the convergence rate and is chosen by the user. Alternately updating $\rho^k$ and $s^k$ produces a sequence $\rho^k \rightarrow \rho$, the solution to the constrained problem.
 
-Updating $s^k$ is straightforward. Minimization of the unconstrained step in (\ref{gbregman}) is done by introducing auxillary variables, $d_x = \nabla_x \rho$, $d_y = \nabla_y \rho$, and $w = D\rho$, allowing us to rewrite our $\rho^k$ update in the equlivalent split form
+Updating $s^k$ is straightforward. Minimization of the unconstrained step in (\ref{gbregman}) is done by introducing auxiliary variables, $d_x = \nabla_x \rho$, $d_y = \nabla_y \rho$, and $w = D\rho$, allowing us to rewrite our $\rho^k$ update in the equivalent split form
 
 \begin{align}\label{spilt}
     \rho^{k+1} & \left.\begin{array}{l} = \min_\rho \|(d_x,d_y)\|_2 + | w | + \frac{\mu}{2} \| A\rho - s^k \|^2 \\ \end{array}\right. \\
@@ -233,7 +222,7 @@ shrink(x,a) = \frac{x}{|x|} \max (|x|-a,0).
 \end{equation}
 The constants $\lambda$ and $\gamma$ are chosen by the user and affect the convergence rate.
 
-Computationally, the $\rho^{k+1}$ update is the most expensive part of our algorithm by a wide margin. The speed of our image reconstruction is thus largely determined by how fast we can solve this minimization. In the purely Fourier case an analytic solution exists leading to a notably fast algorithm []. We have no such formula for the generalized $A$ we work with and instead rely on iterations of the conjugate gradient method to update $\rho^{k+1}$.
+Computationally, the $\rho^{k+1}$ update is the most expensive part of our algorithm by a wide margin. The speed of our image reconstruction is thus largely determined by how fast we can solve this minimization. In the purely Fourier case an analytic solution exists leading to a notably fast algorithm \cite{Goldstein2009a}. We have no such formula for the generalized $A$ we work with and instead rely on iterations of the conjugate gradient method to update $\rho^{k+1}$.
 
 By differentiating with respect to $\rho$ and setting the result to zero we find our $\rho^{k+1}$ update as the solution to
 \begin{equation}
@@ -268,13 +257,13 @@ notably speeding our updates.
 
 Our hybrid reconstruction method is compared against three alternate approaches: uncorrected nonuniform-FFT, field corrected total vairation regularization, and field corrected framelet regularization.
 
-The nonuniform Fourier transforms are computed with [] and 11 points of interpolation. 
+The nonuniform Fourier transforms are computed with \cite{Fessler2003} and 11 points of interpolation. 
 
 \begin{center}
 \begin{figure}[h!]
 \includegraphics[width=2in,height=2in]{exact_brain_128.eps}
 \includegraphics[width=2in,height=2in]{fmap.eps}
-\caption{Exact $128 \times 128$ image used for reconstruction experiments and corresponding field map. Taken from [].}
+\caption{Exact $128 \times 128$ image used for reconstruction experiments and corresponding field map. Taken from \cite{Fessler2003}.}
 \end{figure}
 \end{center}
 
@@ -299,7 +288,7 @@ The nonuniform Fourier transforms are computed with [] and 11 points of interpol
 \includegraphics[width=1.2in,height=1.2in]{tvonly45_brain_128.eps}
 \includegraphics[width=1.2in,height=1.2in]{frameletonly45_brain_128.eps}
 \includegraphics[width=1.2in,height=1.2in]{tvframelet45_brain_128.eps}
-\caption{Reconstruction of brain image from 40\% $k$-space data. Clockwise from top left: nufft [] of raw data, TV regularization $\| \rho - \rho_{exact} \| = 32.0884$, framelet regularization $\| \rho - \rho_{exact} \| = 14.3459$, hybrid regularization $\| \rho - \rho_{exact} \| = 9.9995$ . All iterative methods were stopped after 2997 applications of $A$.}
+\caption{Brain image reconstruction. Columns correspond to NUFFT, TV, Framelet, and TV-Framelet regularizations. Rows correspond to downsample factors of 1.5 - 4.5x. All iterative methods were stopped after 2997 applications of $A$.}
 \end{figure}
 \end{center}
 

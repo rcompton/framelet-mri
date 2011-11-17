@@ -5,7 +5,7 @@ close all;clear all;
 
 addpath('./Framelet/');
 addpath('./BregmanCookbook/');
-addpath(genpath('~./Dropbox/irt'));
+addpath('./nufft_files');
 
 stream = RandStream('mt19937ar');
 
@@ -14,19 +14,19 @@ vec = inline('reshape(x,[numel(x) 1])','x');
 unvec = inline('reshape(x,[m n])','x','m','n');
 
 %img = double(rgb2gray(imread('bouchard_mri_clean.png')));
-%img = double(imread('phantom.gif'));
-load mri;
-img = double(D(:,:,1,19));
+img = double(imread('phantom.gif'));
+%load mri;
+%img = double(D(:,:,1,19));
 %img = double(rgb2gray(imread('cleanbrain.png')));
 %img = double(imread('brainweb_t1.jpg'));
 
 %resize to a nice square
-n = 128;
+n = 64;
 img = imresize(img,[n n]);
 m=n;
 
 %number of sample for compressed sense
-num_samples = round(m*n/1.5);
+num_samples = round(m*n/3.5);
 
 %the downsample operator matrix, could be done away with now that I have
 %nufft library but it works and was easy
@@ -147,7 +147,7 @@ n_level = 1;
 
 
 %We minimize nu*|nabla u| + exci*|Du| st Au = f
-nu = 0;
+nu = 1;
 exci = 1;
 
 %% Pick the mus, lambdas and gammas.... I don't know a good way to get them
@@ -175,15 +175,15 @@ if exci == 0
 end
 
 %create the AtA operator. for some reason lk convolution works best.
-lk = zeros(m,n);
-lk(1,1) = 4;lk(1,2)=-1;lk(2,1)=-1;lk(m,1)=-1;lk(1,n)=-1;
+%lk = zeros(m,n);
+%lk(1,1) = 4;lk(1,2)=-1;lk(2,1)=-1;lk(m,1)=-1;lk(1,n)=-1;
+%AtA = @(x) mu*At(A(x)) + lambda*vec(ifft2(fft2(unvec(x,m,n)).*fft2(lk))) + gamma*x;
 
-%AtA = @(x) vec( mu*At(A( unvec(x,m,n) )) + lambda*ifft2(fft2(reshape(x,m,n)).*fft2(lk)) + gamma.*unvec(x,m,n) );
+%create AtA another way. Maybe faster this way...
+lk = -2*fspecial('laplacian',1);
+AtA = @(x) mu*At(A(x)) + lambda*vec(filter2(lk,unvec(x,m,n))) + gamma*x;
 
-%using the samplefun
-%AtA = @(x) mu*At(A( x )) + vec(lambda*ifft2(fft2(unvec(x,m,n)).*fft2(lk))) + gamma.*x ;
-%samplev = @(x)samplefun(R,B,C,x,false);
-AtA = @(x) mu*At(A(x)) + lambda*vec(ifft2(fft2(unvec(x,m,n)).*fft2(lk))) + gamma*x;
+
 
 %set initial guesses
 U = FraDecMultiLevel(zeros(m,n),D,n_level);
