@@ -1,4 +1,4 @@
-\documentclass[11pt]{amsart}
+\documentclass[12pt]{amsart}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsthm}
@@ -121,28 +121,13 @@ In our corrected system matrix we can infer that each term in the sum (\ref{apro
 \|B_l \mathcal{G} C_l x \|_2 & \leq & \|B_l\| \|\mathcal{G} C_l x\|_2 \\ 
 & \leq & \max_i(b_{il}) (1+\delta_s^{\mathcal{G}})\max_j(c_{lj})\| x \|_2
 \end{eqnarray}
-as well as the corresponding lower bound to give us a restricted isometry constant for an $L=1$ correction to our inhomogeneity
+as well as the analogous lower bound. A crude estimate for the restricted isometry constant for an $L=1$ correction to our inhomogeneity is then
 \begin{dmath}
 \delta_s^{B_l \mathcal{G} C_l} \leq \min( 1-\min_i(b_{il})\min_j(c_{lj}) + \min_i(b_{il})\min_j(c_{lj})\delta_s^{\mathcal{G}}, \; 
 1-\max_i(b_{il})\max_j(c_{lj}) + \max_i(b_{il})\max_j(c_{lj})\delta_s^{\mathcal{G}}).
 \end{dmath}
 Larger values for $L$ increase the corresponding isometry constants and as a result more samples are required for accurate image recovery than in the pure Fourier case. 
 
-\subsection{Sparse recovery via $l1$ minimization}
-
-We reduce scan time by appealing to the theory of compressed sensing, downsampling our Fourier matrix uniformly at random and accounting for the missing data with sparsity promoting regularization. The canonical image reconstruction problem is then
-\begin{equation}\label{csequ}
-\underset{\rho}{\operatorname{argmax}} \: J(\rho)  \text{ subject to } A \rho = s
-\end{equation}
-where $J$ represents some form of $l1$ regularization.
-
-While MR images are not sparse in the image domain, they are sparse in an appropriately chosen transform domain \cite{Lustig2007}. Representation of images in bases of wavelets \cite{Duarte}, and by extension, framelets \cite{Daubechies2001} yield sparse collections of coefficients. Similarly, reconstruction methods based on the total variation \cite{Rudin1992} norm as well as its nonlocal counterpart \cite{Liang2009} have been shown to accurately reproduce edges from sparse frequency data.
-
-In this work we advocate a hybrid of total variation and framelet regularizers,
-\begin{equation}
-J(\rho) = | \nabla \rho| + | D \rho |
-\end{equation}
-where the first term is a total variation norm and $D$ is the discrete framelet decomposition \cite{Cai2008}. As we will see, not only does this combined regularization improve image quality, it markedly decreases computational cost when compared with a solitary total variation regularizer as the subproblems we solve in our minimization become better conditioned.
 
 \subsection{Frames and Framelets}
 
@@ -157,6 +142,26 @@ Recall that a wavelet system is the collection of dilations and shifts of a fini
 X(\Psi) = \left\{ 2^{k/2}\psi(2^kx-j) \: : \: \psi \in \Psi,k,j\in \Z \right\}.
 \end{equation}
 When $X(\Psi)$ is a tight frame the elements, $\psi$, are called ``framelets''. Stacking the basis elements as row vectors of a matrix $D$ we have that $D^tD = I$. However $DD^t = I$ may not hold. The decomposition $Df$ may be computed efficiently via the discrete wavelet transform. We adopt the piecewise linear B-spline framelet in this work \cite{Cai2010a}. More details on framelets may be found in \cite{Caia} \cite{Daubechies2001} and \cite{Cai2010a}.
+
+
+\subsection{Sparse recovery via $l1$ minimization}
+
+We reduce scan time by appealing to the theory of compressed sensing, downsampling our Fourier matrix uniformly at random and accounting for the missing data with sparsity promoting regularization. The canonical image reconstruction problem is
+\begin{equation}\label{csequ}
+\underset{\rho}{\operatorname{argmax}} \: J(\rho)  \text{ subject to } A \rho = s
+\end{equation}
+where $J$ represents some form of $l1$ regularization.
+
+While MR images are not sparse in the image domain, they are sparse in an appropriately chosen transform domain \cite{Lustig2007}. Representation of images in bases of wavelets \cite{Duarte}, and by extension, framelets \cite{Daubechies2001} yield sparse collections of coefficients. Similarly, reconstruction methods based on the total variation norm \cite{Rudin1992} as well as its nonlocal counterpart \cite{Liang2009} have been shown to accurately reproduce detailed images from sparse frequency data.
+
+In this work we advocate a hybrid of total variation and framelet regularization,
+\begin{equation}
+J(\rho) = | \nabla \rho| + | D \rho |
+\end{equation}
+where the first term is a total variation norm and $D$ is the discrete framelet decomposition \cite{Cai2008}. The total variation term enhances edges in our reconstructed image while the inclusion of the framelet term allows us to reconstruct smooth images. It has been found previously that hybrid regularizations often lead to superior image quality \cite{Goldstein2009a}.
+
+Not only does this combined regularization improve image quality, it markedly decreases computational cost when compared with a solitary total variation regularizer as the subproblems we solve in our minimization become better conditioned.
+
 
 \subsection{Split Bregman iterations for image recovery}
 
@@ -201,17 +206,17 @@ This constrained optimization is then converted to a sequence of unconstrained p
 \While{ $\| A\rho^k - s \|_2^2 > tol$ }{
 \For{$i=1 \text{ to } n_{inner}$}{
 
-$\rho^{k+1} = \min_\rho \left\{ \begin{array}{l} \frac{\mu}{2}\|A\rho - s^k\|^2 + \frac{\lambda}{2}\|d_x^k - \nabla_x\rho - b_x^k\|^2 \\ + \frac{\lambda}{2}\|d_x^k - \nabla_x\rho - b_x^k\|^2 + \frac{\gamma}{2}\|w^k - D\rho - b_w^k\|^2 \end{array} \right\}$\;
+$\rho^{k+1} = \min_\rho \left\{ \begin{array}{l} \frac{\mu}{2}\|A\rho - s^k\|^2 + \frac{\lambda}{2}\|d_x^k - \nabla_x\rho - b_x^k\|^2 \\ + \frac{\lambda}{2}\|d_x^k - \nabla_x\rho - b_x^k\|^2 + \frac{\gamma}{2}\|w^k - D\rho - b_w^k\|^2 \end{array} \right\}$\\
 
-$d_x^{k+1} = shrink(\nabla_x \rho^{k+1} + b_x^k, 1/\lambda)$\;
-$d_y^{k+1} = shrink(\nabla_y \rho^{k+1} + b_y^k, 1/\lambda)$\;
-$w^{k+1} = shrink(D \rho^{k+1} + b_w^k, 1/\gamma)$\;
-$b_x^{k+1} = b_x^{k} + (\nabla_x \rho^{k+1} - d_x^{k+1})$\;
-$b_y^{k+1} = b_y^{k} + (\nabla_y \rho^{k+1} - d_y^{k+1})$\;
-$b_w^{k+1} = b_w^{k} + (D \rho^{k+1} - w^{k+1})$\;
+$d_x^{k+1} = shrink(\nabla_x \rho^{k+1} + b_x^k, 1/\lambda)$\\
+$d_y^{k+1} = shrink(\nabla_y \rho^{k+1} + b_y^k, 1/\lambda)$\\
+$w^{k+1} = shrink(D \rho^{k+1} + b_w^k, 1/\gamma)$\\
+$b_x^{k+1} = b_x^{k} + (\nabla_x \rho^{k+1} - d_x^{k+1})$\\
+$b_y^{k+1} = b_y^{k} + (\nabla_y \rho^{k+1} - d_y^{k+1})$\\
+$b_w^{k+1} = b_w^{k} + (D \rho^{k+1} - w^{k+1})$\\
 
 }
-$s^{k+1} = s^k + s - A\rho^{k+1}$\;
+$s^{k+1} = s^k + s - A\rho^{k+1}$\\
 }
 \end{algorithm}
 
@@ -257,13 +262,26 @@ notably speeding our updates.
 
 Our hybrid reconstruction method is compared against three alternate approaches: uncorrected nonuniform-FFT, field corrected total vairation regularization, and field corrected framelet regularization.
 
-The nonuniform Fourier transforms are computed with \cite{Fessler2003} and 11 points of interpolation. 
+The nonuniform Fourier transforms are computed with the min-max method of \cite{Fessler2003} using $6$ points of interpolation. 
 
 \begin{center}
 \begin{figure}[h!]
 \includegraphics[width=2in,height=2in]{exact_brain_128.eps}
+\includegraphics[width=2in,height=2in]{phantom.eps}
 \includegraphics[width=2in,height=2in]{fmap.eps}
-\caption{Exact $128 \times 128$ image used for reconstruction experiments and corresponding field map. Taken from \cite{Fessler2003}.}
+\caption{Exact $128 \times 128$ brain image, $64 \times 64$ phantom, and field map used in reconstruction experiments. Field map taken from \cite{Fessler2003}.}
+\end{figure}
+\end{center}
+
+
+\begin{center}
+\begin{figure}[h!]
+\includegraphics[width=2in,height=2in]{phantom_actuals_vs_matrix.eps}
+\includegraphics[width=2in,height=2in]{phantom_actuals_vs_bregman.eps}
+\linebreak
+\includegraphics[width=2in,height=2in]{phantom_residuals_vs_matrix.eps}
+\includegraphics[width=2in,height=2in]{phantom_residuals_vs_bregman.eps}
+\caption{Reconstruction errors on phantom after $2000$ applications of $A$ at $3$x undersampling. Top row: image domain error, $\log \| \rho - \rho_{exact}\|$, vs number of matrix multiplications and Bregman iteration count. Bottom row: residual error, $\log \| A\rho - s \|$. TV, framelet, and hybrid regularization in red, green, and blue, respectively. Splitting parameter $\mu=1$, $\lambda=0.5$, and $\gamma=25$.}
 \end{figure}
 \end{center}
 
@@ -306,13 +324,18 @@ The nonuniform Fourier transforms are computed with \cite{Fessler2003} and 11 po
 \end{tabular}
 \end{center}
 
+
 \begin{center}
 \begin{figure}[h!]
-\includegraphics[width=2in,height=2in]{actual_errors.eps}
-\includegraphics[width=2in,height=2in]{residual_errors.eps}
-\caption{Reconstruction errors at $2.5$x undersampling. Left: Actual error ($\| \rho -\rho_{exact} \|$) vs Bregman iteration count. Right: Residual error ($\| A\rho - s \|$). Hybrid regularization in blue, framelet only in red.}
+\includegraphics[width=2in,height=2in]{actual_errors_vs_matrix_mult_brain.eps}
+\includegraphics[width=2in,height=2in]{actual_errors_vs_bregman_brain.eps}
+\linebreak
+\includegraphics[width=2in,height=2in]{residual_errors_vs_matrix_mult_brain.eps}
+\includegraphics[width=2in,height=2in]{residual_errors_vs_bregman_brain.eps}
+\caption{Brain image reconstruction errors after $3000$ applications of $A$ at $2.5$x undersampling. Top row: image domain error, $\log \| \rho - \rho_{exact}\|$, vs number of matrix multiplications and Bregman iteration count. Bottom row: residual error, $\log \| A\rho - s \|$. TV, framelet, and hybrid regularization in red, green, and blue, respectively. Splitting parameter $\mu=1$, $\lambda=0.5$, and $\gamma=25$.}
 \end{figure}
 \end{center}
+
 
 
 

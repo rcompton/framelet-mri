@@ -14,19 +14,19 @@ vec = inline('reshape(x,[numel(x) 1])','x');
 unvec = inline('reshape(x,[m n])','x','m','n');
 
 %img = double(rgb2gray(imread('bouchard_mri_clean.png')));
-img = double(imread('phantom.gif'));
-%load mri;
-%img = double(D(:,:,1,19));
+%img = double(imread('phantom.gif'));
+load mri;
+img = double(D(:,:,1,19));
 %img = double(rgb2gray(imread('cleanbrain.png')));
 %img = double(imread('brainweb_t1.jpg'));
 
 %resize to a nice square
-n = 64;
+n = 128;
 img = imresize(img,[n n]);
 m=n;
 
 %number of sample for compressed sense
-num_samples = round(m*n/3.5);
+num_samples = round(m*n/2.5);
 
 %the downsample operator matrix, could be done away with now that I have
 %nufft library but it works and was easy
@@ -66,8 +66,8 @@ omega = omega(samp_coords,:);
 %%
 
 %the number of neighbors to use when interpolating
-j1 = 11;
-j2 = 11;
+j1 = 6;
+j2 = 6;
 %the fft sizes? 2*n works nice.
 k1 = 2*m;
 k2 = 2*n;
@@ -148,14 +148,14 @@ n_level = 1;
 
 %We minimize nu*|nabla u| + exci*|Du| st Au = f
 nu = 1;
-exci = 1;
+exci = 0;
 
 %% Pick the mus, lambdas and gammas.... I don't know a good way to get them
 %% right
 
-mu = 1;
-lambda = .575;
-gamma = 25;
+mu = 1.5;
+lambda = 1.4;
+gamma = lambda*50;
 
 
 
@@ -175,13 +175,13 @@ if exci == 0
 end
 
 %create the AtA operator. for some reason lk convolution works best.
-%lk = zeros(m,n);
-%lk(1,1) = 4;lk(1,2)=-1;lk(2,1)=-1;lk(m,1)=-1;lk(1,n)=-1;
-%AtA = @(x) mu*At(A(x)) + lambda*vec(ifft2(fft2(unvec(x,m,n)).*fft2(lk))) + gamma*x;
+lk = zeros(m,n);
+lk(1,1) = 4;lk(1,2)=-1;lk(2,1)=-1;lk(m,1)=-1;lk(1,n)=-1;
+AtA = @(x) mu*At(A(x)) + lambda*vec(ifft2(fft2(unvec(x,m,n)).*fft2(lk))) + gamma*x;
 
 %create AtA another way. Maybe faster this way...
-lk = -2*fspecial('laplacian',1);
-AtA = @(x) mu*At(A(x)) + lambda*vec(filter2(lk,unvec(x,m,n))) + gamma*x;
+%lk = -2*fspecial('laplacian',1);
+%AtA = @(x) mu*At(A(x)) + lambda*vec(filter2(lk,unvec(x,m,n))) + gamma*x;
 
 
 
@@ -205,8 +205,10 @@ figgn = figure();
 
 %constrained, replace f with fl and update after each unconstrained
 fl = f;
-errorsr = [0];
-errors = [0];
+errorsr = [];
+errors = [];
+errors_per_breg = [];
+errorsr_per_breg = [];
 subplot(2,2,1);
 imagesc(img);colormap hot;
 subplot(2,2,2);
@@ -216,16 +218,17 @@ iters = [];
 %start the optimization outer loop is constraint enforcement
 %2997 matches what happened for framelet
 ell = 0;
-while( (ell < 500) && (sum(iters)<2997))
+%while( (ell < 150) && (sum(iters)<2000))
+while(sum(iters) < 3000)
     ell = ell+1;
     %unconstrained
-    for k=1:3
+    for k=1:5
         %update u
         rhsD = FraRecMultiLevel(SubFrameletArray(dw,bw),Dt,n_level);
         rhs = mu.*unvec(At(vec(fl)),m,n) + lambda.*Dxt(dx - bx) + lambda.*Dyt(dy - by) + gamma.*rhsD;
         
         %this is where everything sucks.
-        [u,flag,reles,iter] = pcg(AtA,vec(rhs),1e-3);
+        [u,flag,reles,iter] = pcg(AtA,vec(rhs),1e-3,20);
         iters = [iters iter];
         
         if randi(5)==randi(5)
@@ -249,13 +252,15 @@ while( (ell < 500) && (sum(iters)<2997))
         bx = bx + (Dx(u) - dx);
         by = by + (Dy(u) - dy);
         
+        errorsr = [errorsr norm(A(vec(u)) - f,'fro')/norm(f,'fro')];
+        errors = [errors norm(u/max(u(:)) - img/max(img(:)),'fro')];
+        
     end
     %fl = fl + f - unvec(A(vec(u)),m,n);
     fl = fl + f - A(vec(u));
-    
-    errorsr = [errorsr norm(A(vec(u)) - f,'fro')/norm(f,'fro')];
-    errors = [errors norm(u/max(u(:)) - img/max(img(:)),'fro')];
-    
+    errorsr_per_breg = [errorsr_per_breg norm(A(vec(u)) - f,'fro')/norm(f,'fro')];
+    errors_per_breg = [errors_per_breg norm(u/max(u(:)) - img/max(img(:)),'fro')];
+
     
     if randi(1)==1
         subplot(2,2,2)
@@ -278,7 +283,7 @@ while( (ell < 500) && (sum(iters)<2997))
         colormap hot;
         pause(0.01);
         
-        fprintf('step ell = %i error (u-img): %f \n', [ell errors(end)]);
+        fprintf('step ell = %i error (u-img): %f Ax iter numer: %i \n', [ell errors(end) sum(iters)]);
         aviobj = addframe(aviobj,figgn);
     end
     

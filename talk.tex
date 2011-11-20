@@ -1,0 +1,485 @@
+%\documentclass{beamer}
+%\usetheme{Boadilla}
+%\usecolortheme{albatross}
+%\usecolortheme{beetle}
+
+\documentclass[xcolor=dvipsnames]{beamer} 
+%\usetheme{Berkeley}
+\usetheme{Madrid}
+\usecolortheme[named=Brown]{structure} 
+
+\usepackage{amsthm}
+\usepackage{cite}
+
+%\usepackage[round]{natbib}
+%\def\newblock{\hskip .11em plus .33em minus .07em}
+
+\usepackage{beamerthemesplit}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+
+\usepackage{graphicx}
+
+\usepackage[ruled]{algorithm2e}
+\SetKwInput{KwInit}{Initialize}
+
+\DeclareSymbolFont{AMSb}{U}{msb}{m}{n}
+\DeclareMathSymbol{\N}{\mathbin}{AMSb}{"4E}
+\DeclareMathSymbol{\Z}{\mathbin}{AMSb}{"5A}
+\DeclareMathSymbol{\R}{\mathbin}{AMSb}{"52}
+\DeclareMathSymbol{\Q}{\mathbin}{AMSb}{"51}
+\DeclareMathSymbol{\I}{\mathbin}{AMSb}{"49}
+\DeclareMathSymbol{\C}{\mathbin}{AMSb}{"43}
+
+\setbeamerfont{section title}{parent=title}
+\setbeamercolor{section title}{parent=titlelike}
+\defbeamertemplate*{section page}{default}[1][]
+{
+  \centering
+    \begin{beamercolorbox}[sep=8pt,center,#1]{section title}
+      \usebeamerfont{section title}\insertsection\par
+    \end{beamercolorbox}
+}
+\newcommand*{\sectionpage}{\usebeamertemplate*{section page}}
+
+
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{lem}[thm]{Lemma}
+\theoremstyle{remark}
+\newtheorem{rem}{Remark}
+
+\title{Hybrid regularization for iterative MRI reconstruction in the presence of field inhomogeneities}
+\author{Ryan Compton}
+\date{November 22, 2011}
+
+\begin{document}
+
+
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\section{Problem}
+\frame{\sectionpage}
+
+\begin{frame}
+The traditional model of MR image formation is based on solving for the proton density map, $\rho(\mathbf{r})$, in the signal equation
+
+\begin{equation}\label{sigeq}
+s(t) = \int_{\mathbb{R}^2} \rho(\mathbf{r})e^{-2\pi i \mathbf{k}(t) \cdot \mathbf{r}} d\mathbf{r}
+\end{equation}
+
+where $s(t)$ is the recorded signal and the $k$-space coordinates, $\mathbf{k}(t)$, are known only on a nonuniform and possibly undersampled grid \cite{Haacke1999}.
+\end{frame}
+
+\begin{frame}
+
+\begin{center}
+\begin{figure}
+\includegraphics[width=2in,height=2in]{mri-scannercoils.eps}
+\end{figure}
+\end{center}
+
+\end{frame}
+
+
+\begin{frame}
+
+In clinical scanners typical values for the fields we work with are
+\begin{itemize}
+\item Background field $B_0 \approx 15,000$ gauss
+\item Gradient fields $G = \nabla B_0  \approx 4$ gauss/cm
+\item RF field $B_1 < .2$ gauss
+\item MR signal is less than $10^{-6}$ gauss
+\pause
+\item A typical refridgerator magnet $\approx 50$ gauss.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}
+
+Huge field strengths are neccessary as inhomogeneity in the main field distorts the Fourier coding scheme.
+
+\end{frame}
+
+\begin{frame}
+This complicates the construction of research MR devices.
+
+\begin{center}
+\begin{figure}
+\includegraphics[width=2in,height=2in]{portable-photo.eps}
+\end{figure}
+\end{center}
+\end{frame}
+
+\begin{frame}
+\begin{center}
+\begin{figure}
+\includegraphics[width=2in,height=2in]{portable-field.eps}
+\end{figure}
+\end{center}
+
+\end{frame}
+
+\begin{frame}
+
+Variations in magnetic suseptibility of the sample being imaged lead to additional inhomogeneities.
+\pause
+\begin{center}
+\begin{figure}
+\includegraphics[width=1.3in]{F1.large.eps}
+\includegraphics[width=1.3in]{F2.large.eps}
+\caption{15-year-old boy with acute sinusitis and subdural empyemas. Gadolinium-enhanced sagittal (A) and coronal (B) T1-weighted images show left subdural empyema and image distortion from susceptibility artifacts caused by iron oxide particles suspended in beeswax dressing in patient's hair.}
+\end{figure}
+\end{center}
+
+\end{frame}
+
+\begin{frame}
+
+Air/tissue interfaces are prone to magnetic susceptibility variations.
+
+\pause
+
+Scans with long readout times are more sensitive to these inhomogeneities.
+
+\pause
+
+This is of specific importance when imaging for surgical planning near the nasal sinuses, ears, and cerebral cortex \cite{Moerland1995} \cite{Neufeld2005}.
+
+
+\end{frame}
+
+
+\begin{frame}
+
+Our model of MR image formation generalizes the previous signal equation to 
+
+\begin{equation}%\label{sigeq}
+s(t) = \int_{\mathbb{R}^2} \rho(\mathbf{r})e^{-z(\mathbf{r})t}e^{-2\pi i \mathbf{k}(t) \cdot \mathbf{r}} d\mathbf{r}
+\end{equation}
+where $z(\mathbf{r})$ contains information about relaxation and off-resonance effects.
+
+\end{frame}
+
+\begin{frame}
+
+An $n$ point discretization of the physical space integral at $m$ different values of $t$ leads to the $m \times n$ linear system
+\begin{equation}\label{dissigeq}
+\vec{s} = A \vec{\rho}
+\end{equation}
+with system matrix
+\begin{equation}\label{aij}
+A_{ij} = e^{-z(\mathbf{r}_j)t_i}e^{-2\pi i \mathbf{k}(t_i) \cdot \mathbf{r}_j}.
+\end{equation}
+
+\pause
+
+The goal of MRI reconstruction is to efficiently invert the linear system (\ref{dissigeq}) in a way that produces high quality images.
+
+\end{frame}
+
+\section{Method}
+\frame{\sectionpage}
+
+
+\begin{frame}
+
+In order to invert the system with an iterative method we must be able to compute $Ax$.
+
+\pause
+
+However, directly forming $A$ is infeasible for practical medical image sizes.
+
+To produce a $512 \times 512$ image the (dense) $A$ matrix takes on dimensions $512^2 \times 512^2$. Storing $A$ in 32-bit floating point precision requires 256GB of space.
+
+\end{frame}
+
+\begin{frame}
+
+Given a field map, $z(\mathbf{r})$,
+\begin{center}
+\begin{figure}
+\includegraphics[width=2in,height=2in]{fmap.eps}
+\end{figure}
+\end{center}
+we have at our disposal many methods of operator compression.
+
+\end{frame}
+\begin{frame}
+
+\begin{center}
+\begin{figure}
+\includegraphics[width=1.3in,height=1.3in]{dftreal.eps}
+\includegraphics[width=1.3in,height=1.3in]{dftrealprox.eps}
+\linebreak
+\includegraphics[width=1.3in,height=1.3in]{dftimag.eps}
+\includegraphics[width=1.3in,height=1.3in]{dftimagprox.eps}
+\caption{Randomly downsampled DFT matrix and field map corrected non Fourier operator}
+\end{figure}
+\end{center}
+
+\end{frame}
+
+
+\begin{frame}
+
+Time segmentation \cite{Sutton2003} selects a subset of points, $\{ \hat{t}_l \} \in [0,T]$ and interpolates about an optimal rate map value
+\begin{equation}
+b_{il} = b_l(t_i)e^{-\overline{\omega}t_i}
+\end{equation}
+
+\begin{equation}
+c_{lj} = e^{-(\omega_j - \overline{\omega}t_i)\hat{t}_l}
+\end{equation}
+
+\end{frame}
+
+\begin{frame}
+
+Frequency segmentation \cite{Man} selects a subset of frequencies to evaluate the exponential at and interpolates the rest.
+\begin{equation}
+b_{il} = e^{-\hat{\omega}_l(t_i - \overline{t})}
+\end{equation}
+\begin{equation}
+c_{lj} = c_l(\omega_j) e^{-\omega_j\overline{t}}
+\end{equation}
+
+\end{frame}
+
+\begin{frame}
+
+Standard low rank approximation methods (e.g. PCA \cite{Rokhlin}, randomized ID \cite{Liberty2007}) are also possible. These will produce more accurate approximations to the off resonance factor at a significant computational expense.
+
+\end{frame}
+
+\begin{frame}
+
+Application of $A$ proceeds as
+\begin{equation}
+(Ax)_i = \sum_{l=1} b_{il} \sum_{j=1}^n x_j c_{lj} e^{-2\pi i \mathbf{k}(t_i) \cdot \mathbf{r}_j}.
+\end{equation}
+
+\pause
+In matrix notation,
+
+\begin{equation}\label{aprox}
+A = \sum_{l=1}^L B_l \mathcal{G} C_l 
+\end{equation}
+where $B_l$ and $C_l$ are diagonal matrices ($B_l = diag (b_{il})$, $C_l = diag (c_{lj})$) and $\mathcal{G}$ is a nonuniform discrete Fourier transform of type 2 \cite{Greengard2004}.
+
+\end{frame}
+
+\begin{frame}
+The modified system matrix obeys uncertainty properties differing from the pure Fourier case.
+\pause
+
+Recall the concept of a {\it restricted isometry constant}, $\delta_s^A$, of a matrix $A$ for an integer $s$ as the smallest number such that
+\begin{equation}
+(1-\delta_s^A)\|x\|_{l2}^2 \leq \|Ax\|_{l2}^2 \leq (1+\delta_s^A)\|x\|_{l2}^2
+\end{equation}
+where $s$ is the number of nonzero entries in $x$. 
+
+\end{frame}
+
+\begin{frame}
+In our corrected system matrix we can infer that each term in the sum (\ref{aprox}) has less than ideal isometric properties by examining
+\begin{eqnarray}
+\|B_l \mathcal{G} C_l x \|_2 & \leq & \|B_l\| \|\mathcal{G} C_l x\|_2 \\ 
+& \leq & \max_i(b_{il}) (1+\delta_s^{\mathcal{G}})\max_j(c_{lj})\| x \|_2
+\end{eqnarray}
+as well as the analogous lower bound.
+\end{frame}
+
+\begin{frame}
+A crude estimate for the restricted isometry constant for an $L=1$ correction to our inhomogeneity is then
+\begin{equation}
+\delta_s^{B_l \mathcal{G} C_l} \leq \min \left( \begin{array}{l}1-\min_i(b_{il})\min_j(c_{lj}) + \min_i(b_{il})\min_j(c_{lj})\delta_s^{\mathcal{G}}, \\ 
+1-\max_i(b_{il})\max_j(c_{lj}) + \max_i(b_{il})\max_j(c_{lj})\delta_s^{\mathcal{G}} \end{array} \right)
+\end{equation}
+
+
+Larger values for $L$ increase the corresponding isometry constants and more samples are required for accurate image recovery than in the pure Fourier case.
+\end{frame}
+
+\begin{frame}
+The canonical image reconstruction problem remains
+\begin{equation}\label{csequ}
+\underset{\rho}{\operatorname{argmax}} \: J(\rho)  \text{ subject to } A \rho = s
+\end{equation}
+where $J$ represents some form of $l1$ regularization.
+
+\end{frame}
+
+\begin{frame}
+
+In this work we advocate a hybrid of total variation and framelet regularization,
+\begin{equation}
+J(\rho) = | \nabla \rho| + | D \rho |
+\end{equation}
+where the first term is a total variation norm and $D$ is the discrete framelet decomposition \cite{Cai2008}.
+
+The total variation term enhances edges while the inclusion of the framelet term allows us to reconstruct smooth images.
+
+It has been found previously that hybrid regularizations often lead to superior image quality \cite{Goldstein2009a}.
+\end{frame}
+
+
+\begin{frame}
+\begin{algorithm}[H]
+\caption{Split Bregman iteration for constrained optimization}
+\label{sbalgo}
+
+\KwInit{ $\rho^0 = A^t s$, and $d_x^0=d_y^0=w^0=b_x^0=b_y^0=b_w^0=0$}
+
+\While{ $\| A\rho^k - s \|_2^2 > tol$ }{
+\For{$i=1 \text{ to } n_{inner}$}{
+
+$\rho^{k+1} = \min_\rho \left\{ \begin{array}{l} \frac{\mu}{2}\|A\rho - s^k\|^2 + \frac{\lambda}{2}\|d_x^k - \nabla_x\rho - b_x^k\|^2 \\ + \frac{\lambda}{2}\|d_x^k - \nabla_x\rho - b_x^k\|^2 + \frac{\gamma}{2}\|w^k - D\rho - b_w^k\|^2 \end{array} \right\}$\\
+
+$d_x^{k+1} = shrink(\nabla_x \rho^{k+1} + b_x^k, 1/\lambda)$\\
+$d_y^{k+1} = shrink(\nabla_y \rho^{k+1} + b_y^k, 1/\lambda)$\\
+$w^{k+1} = shrink(D \rho^{k+1} + b_w^k, 1/\gamma)$\\
+$b_x^{k+1} = b_x^{k} + (\nabla_x \rho^{k+1} - d_x^{k+1})$\\
+$b_y^{k+1} = b_y^{k} + (\nabla_y \rho^{k+1} - d_y^{k+1})$\\
+$b_w^{k+1} = b_w^{k} + (D \rho^{k+1} - w^{k+1})$\\
+
+}
+$s^{k+1} = s^k + s - A\rho^{k+1}$\\
+}
+\end{algorithm}
+\end{frame}
+
+\begin{frame}
+Differentiating with respect to $\rho$ and setting the result to zero we find our $\rho^{k+1}$ update as the solution to
+\begin{equation}
+(\mu A^tA + \lambda \nabla_x^t \nabla_x + \lambda + \gamma D^tD )\rho^{k+1} = rhs^k
+\end{equation}
+where
+\begin{equation}
+rhs^k = \mu A^t s^k + \lambda \nabla_x ^t (d_x^k - b_x) + \lambda \nabla_y^t + \gamma D^t(w - b_w).
+\end{equation}
+Making use of the identities $\nabla^t \nabla = - \triangle$ and $D^tD = I$, gives the system
+\begin{equation}\label{hybridsys}
+(\mu A^tA - \lambda \triangle + \gamma I )\rho^{k+1} = rhs^k
+\end{equation}
+which we solve with conjugate gradient iterations.
+
+\end{frame}
+
+\begin{frame}
+
+A major advantage of our hybrid regularizer!
+
+Consider the system resulting from a regularization based only on total variation (ie $\gamma =0$),
+\begin{equation}\label{tvonly}
+(\mu A^tA - \lambda \triangle)\rho^{k+1} = rhs^k.
+\end{equation}
+Denoting maximal and minimal eigenvalues of the matrix in (\ref{tvonly}) by $\lambda_{\max}$ and $\lambda_{\min}$ we can write the condition number of our system as
+\begin{equation}
+\kappa = \frac{\lambda_{\max}}{\lambda_{\min}}.
+\end{equation}
+
+The addition of the framelet regularizer introduces the $\gamma I$ term in (\ref{hybridsys}) reducing the condition number to
+\begin{equation}
+\kappa_\gamma  =  \frac{\lambda_{\max} + \gamma}{\lambda_{\min} + \gamma} < \kappa
+\end{equation}
+notably speeding our updates.
+
+\end{frame}
+
+\section{Numerics}
+\frame{\sectionpage}
+
+\frame{
+
+\begin{center}
+\begin{figure}[h!]
+\includegraphics[width=1.6in,height=1.6in]{exact_brain_128.eps}
+\includegraphics[width=1.6in,height=1.6in]{phantom.eps}
+\includegraphics[width=1.6in,height=1.6in]{fmap.eps}
+\caption{Exact $128 \times 128$ brain image, $64 \times 64$ phantom, and field map used in reconstruction experiments. Field map taken from \cite{Fessler2003}.}
+\end{figure}
+\end{center}
+
+}
+
+\begin{frame}
+\begin{center}
+\begin{figure}
+\includegraphics[width=1.1in,height=1.1in]{nufft15_brain_128.eps}
+\includegraphics[width=1.1in,height=1.1in]{tvonly15_brain_128.eps}
+\includegraphics[width=1.1in,height=1.1in]{frameletonly15_brain_128.eps}
+\includegraphics[width=1.1in,height=1.1in]{tvframelet15_brain_128.eps}
+\linebreak
+\includegraphics[width=1.1in,height=1.1in]{nufft_brain_128.eps}
+\includegraphics[width=1.1in,height=1.1in]{tvonly_brain_128.eps}
+\includegraphics[width=1.1in,height=1.1in]{frameletonly_brain_128.eps}
+\includegraphics[width=1.1in,height=1.1in]{tvframelet_brain_128.eps}
+\caption{Brain image reconstruction. Columns correspond to NUFFT, TV, Framelet, and TV-Framelet regularizations. Rows correspond to downsample factors of 1.3x, 2.5x. All iterative methods were stopped after 2997 applications of $A$.}
+\end{figure}
+\end{center}
+\end{frame}
+
+\begin{frame}
+\begin{center}
+\begin{figure}
+\includegraphics[width=1.1in,height=1.1in]{nufft35_brain_128.eps}
+\includegraphics[width=1.1in,height=1.1in]{tvonly35_brain_128.eps}
+\includegraphics[width=1.1in,height=1.1in]{frameletonly35_brain_128.eps}
+\includegraphics[width=1.1in,height=1.1in]{tvframelet35_brain_128.eps}
+\linebreak
+\includegraphics[width=1.1in,height=1.1in]{nufft45_brain_128.eps}
+\includegraphics[width=1.1in,height=1.1in]{tvonly45_brain_128.eps}
+\includegraphics[width=1.1in,height=1.1in]{frameletonly45_brain_128.eps}
+\includegraphics[width=1.1in,height=1.1in]{tvframelet45_brain_128.eps}
+\caption{Brain image reconstruction. Columns correspond to NUFFT, TV, Framelet, and TV-Framelet regularizations. Rows correspond to downsample factors of 3.5x, 4.5x. All iterative methods were stopped after 2997 applications of $A$.}
+\end{figure}
+\end{center}
+\end{frame}
+
+\begin{frame}
+\begin{center}
+\begin{figure}[h!]
+\includegraphics[width=1.3in,height=1.3in]{actual_errors_vs_matrix_mult_brain.eps}
+\includegraphics[width=1.3in,height=1.3in]{actual_errors_vs_bregman_brain.eps}
+\linebreak
+\includegraphics[width=1.3in,height=1.3in]{residual_errors_vs_matrix_mult_brain.eps}
+\includegraphics[width=1.3in,height=1.3in]{residual_errors_vs_bregman_brain.eps}
+\caption{Brain image reconstruction errors after $3000$ applications of $A$ at $2.5$x undersampling. Top row: image domain error, $\log \| \rho - \rho_{exact}\|$, vs number of matrix multiplications and Bregman iteration count. Bottom row: residual error, $\log \| A\rho - s \|$. TV, framelet, and hybrid regularization in red, green, and blue, respectively. Splitting parameter $\mu=1$, $\lambda=0.5$, and $\gamma=25$.}
+\end{figure}
+\end{center}
+\end{frame}
+
+\begin{frame}
+\begin{center}
+\begin{figure}[h!]
+\includegraphics[width=1.3in,height=1.3in]{phantom_actuals_vs_matrix.eps}
+\includegraphics[width=1.3in,height=1.3in]{phantom_actuals_vs_bregman.eps}
+\linebreak
+\includegraphics[width=1.3in,height=1.3in]{phantom_residuals_vs_matrix.eps}
+\includegraphics[width=1.3in,height=1.3in]{phantom_residuals_vs_bregman.eps}
+\caption{Reconstruction errors on phantom after $2000$ applications of $A$ at $3$x undersampling. Top row: image domain error, $\log \| \rho - \rho_{exact}\|$, vs number of matrix multiplications and Bregman iteration count. Bottom row: residual error, $\log \| A\rho - s \|$. TV, framelet, and hybrid regularization in red, green, and blue, respectively. Splitting parameter $\mu=1$, $\lambda=0.5$, and $\gamma=25$.}
+\end{figure}
+\end{center}
+\end{frame}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%BIBLIOGRAPHY%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[allowframebreaks]{Bibliography}
+
+%\bibliographystyle{alpha}
+\bibliographystyle{plain}
+\bibliography{thebib}
+
+\end{frame}
+
+
+\end{document}
