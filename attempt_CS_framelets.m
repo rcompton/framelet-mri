@@ -3,12 +3,11 @@
 %
 close all;clear all;
 
-addpath('./Framelet/');
-addpath('./BregmanCookbook/');
-addpath('./nufft_files');
+addpath('./Framelet/'); %Jai Feng Cai's Framelet library
+addpath('./BregmanCookbook/'); %Jerome Gilles' Bregman library (has some framelet stuff)
+addpath('./nufft_files'); %Fessler+Greengard+Lustig's nufft
 
 stream = RandStream('mt19937ar');
-
 
 vec = inline('reshape(x,[numel(x) 1])','x');
 unvec = inline('reshape(x,[m n])','x','m','n');
