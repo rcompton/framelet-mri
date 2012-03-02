@@ -21,7 +21,7 @@ img = double(imread('phantom.gif'));
 %img = double(imread('brainweb_t1.jpg'));
 
 %resize to a nice square
-n = 512;
+n = 64;
 img = imresize(img,[n n]);
 m=n;
 
@@ -114,8 +114,8 @@ At = @(x) samplefun_nufft(st,B,C,x,m,n,1);
      Bee(sample_inds) = B{l};
      B2(:, (l-1)*n +1 : l*n) = Bee;
      
-     C2(:, (l-1)*n +1 : l*n) = reshape(C{l},[m n]);
-
+     
+     
  end
      
  A = @(x) samplefun(R,B2,C2,x,0);
@@ -150,13 +150,11 @@ lambda = 1.4;
 gamma = 25;
 
 %the number of times I'm willing to apply A
-maxiters = 231;
+maxiters = 1500;
 
 %watch a video as you do all this?
 video = 1;
 
 %% Run the reconstruction
-tic
 [u, errors, res_errors, errors_per_breg, res_error_per_breg, iters ] = bregman_cs_framelet(f, m, n, A, At, nu, exci, mu, lambda, gamma, maxiters, img, video);
-toc
 

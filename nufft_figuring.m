@@ -4,6 +4,7 @@
 close all;clear all;clc;
 
 addpath(genpath('~./Dropbox/irt'));
+addpath('nufft_files/');
 
 %
 n1 = 75;
