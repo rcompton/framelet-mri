@@ -21,7 +21,7 @@ img = double(imread('phantom.gif'));
 %img = double(imread('brainweb_t1.jpg'));
 
 %resize to a nice square
-n = 512;
+n = 64;
 img = imresize(img,[n n]);
 m=n;
 
@@ -124,6 +124,7 @@ At = @(x) samplefun_nufft(st,B,C,x,m,n,1);
 %% Now that we have a system operator, sample the data in k space
 
 %create sample data
+%f = single(A(vec(img)));
 f = A(vec(img));
 
 %not sure why Tom did this normalization. It works really well though.
@@ -150,7 +151,7 @@ lambda = 1.4;
 gamma = 25;
 
 %the number of times I'm willing to apply A
-maxiters = 231;
+maxiters = 1231;
 
 %watch a video as you do all this?
 video = 1;

@@ -40,10 +40,15 @@ if exci == 0
 end
 
 %create the AtA operator. for some reason lk convolution like this (not conv2) works best.
-lk = zeros(m,n);
-lk(1,1) = 4;lk(1,2)=-1;lk(2,1)=-1;lk(m,1)=-1;lk(1,n)=-1;
-AtA = @(x) mu*At(A(x)) + lambda*reshape(ifft2(fft2(reshape(x,[m n])).*fft2(lk)), [m*n 1]) + gamma*x;
+%lk = zeros(m,n);
+%lk(1,1) = 4;lk(1,2)=-1;lk(2,1)=-1;lk(m,1)=-1;lk(1,n)=-1;
+%AtA = @(x) mu*At(A(x)) + lambda*reshape(ifft2(fft2(reshape(x,[m n])).*fft2(lk)), [m*n 1]) + gamma*x;
 
+%same as above, but it's a bit easier to see what's going on here. Also,
+%easy to extend to 3D, also, possibly faster. Downside is you can't use
+%single precision input.
+Lap = laplacian([m n], {'P','P'}); %negative laplacian
+AtA = @(x) lambda*Lap*x + gamma*x + mu*At(A(x));
 
 %set initial guesses
 U = FraDecMultiLevel(zeros(m,n),D,n_level);
@@ -81,10 +86,11 @@ while(sum(iters) < maxiter)
         
         
         %this is where all the computation happens
-        [u,~,~,iter] = pcg(AtA, reshape(rhs,[numel(rhs) 1]), 1e-3, 20);
+        yy = reshape(rhs,[numel(rhs) 1]);
+        [u,~,~,iter] = pcg(AtA, yy, 1e-4, 30);
         iters = [iters iter];
         
-%        fprintf('                                 pcg error: %d, iter: %i \n', [reles iter]);
+%       fprintf('                                 pcg error: %d, iter: %i \n', [reles iter]);
         
         u = reshape(u,[m n]);
         
@@ -136,7 +142,7 @@ while(sum(iters) < maxiter)
 
         
         colormap hot;
-        pause(0.01);
+        pause(0.03);
         
         fprintf('step ell = %i error (u-img): %f Ax iter numer: %i \n', [ell errors(end) sum(iters)]);
     end
