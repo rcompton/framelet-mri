@@ -20,22 +20,24 @@ stream = RandStream('mt19937ar');
 %img = double(rgb2gray(imread('cleanbrain.png')));
 %img = double(imread('brainweb_t1.jpg'));
 
-%resize to a nice square for a 2D experiment
+% %resize to a nice square for a 2D experiment
 % n = 64;
 % m = 64;
 % k = 1;
 % img = imresize(img,[m n]);
 
 %easy 3D
-img = zeros(32,32,32);
-img(12:20,8:15:9:20) = 1.0;
-img(20:30,8:15,3:7) = 2.0;
-img(15:24,20:30,18:27) = 3.8;
-[m n k] = size(img);
+ img = zeros(32,32,32);
+ img(12:20,8:15:9:20) = 1.0;
+ img(20:30,8:15,3:7) = 2.0;
+ img(15:24,20:30,18:27) = 3.8;
+ img = img + shiftdim(img,2);
 
-%load littlelittlebabymri;
-%img = deedee;
-%[m n k] = size(img);
+
+load littlebabymri.mat;
+img = dee;
+
+[m n k] = size(img);
 
 %number of sample for compressed sense
 num_samples = round(m*n*k/1.5);
@@ -129,17 +131,17 @@ f = f*normFactor;
 
 %We minimize nu*|nabla u| + exci*|Du| st Au = f
 nu = 1;
-exci = 0;
+exci = 1;
 
 %the splitting parameters. There's probably another optimization to figure
 %how to pick the best ones...
 mu = 1;
 lambda = 0.5;
-gammah = 0;
+gammah = 5;
 %gammah = 0;
 
 %the number of times I'm willing to apply A
-maxiters = 13231;
+maxiters = 33231;
 
 %watch a video as you do all this?
 video = 1;

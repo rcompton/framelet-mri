@@ -23,7 +23,7 @@ function [u, errors, res_errors, errors_per_breg, res_errors_per_breg, iters ] =
 %
 
 %don't know if this exists already or not...
-norm3 = @(x) trapz(trapz(trapz(x.^2)));
+norm3 = @(x) sqrt(trapz(trapz(trapz(abs(x).^2))));
 
 
 %1 is for Haar, 2 is for framelet, 3 is for cubic framelet
@@ -50,6 +50,12 @@ end
 %2D
 %Lap = laplacian([m n], {'P','P'}); %negative laplacian
 %AtA = @(x) mu*At(A(x)) + lambda*Lap*x + gamma*x;
+
+%3D
+lk = zeros(m,n);
+%lk(1,1) = 4;lk(1,2)=-1;lk(2,1)=-1;lk(m,1)=-1;lk(1,n)=-1;
+%AtA = @(x) mu*At(A(x)) + lambda*reshape(ifft2(fft2(reshape(x,[m n])).*fft2(lk)), [m*n 1]) + gamma*x;
+
 
 %3D, still seems to work for 2D data
 fprintf('3D Laplacian matrix with 7-point stencil\n');
@@ -87,16 +93,16 @@ ell = 0;
 while(sum(iters) < maxiter)
     ell = ell+1;
     %unconstrained step, 5 is overkill.
-    for kay=1:5
+    for kay=1:3
         %update u
         %rhsD = FraRecMultiLevel(SubFrameletArray(dw,bw),Dt,n_level);
         rhs = mu.*reshape(At(reshape(fl, [numel(fl) 1])),[m n k]);
         rhs = rhs + lambda*(Deriv(dx - bx,1,true) + Deriv(dy - by,2,true) + Deriv(dz - bz,3,true));
-        %        rhs = rhs + gamma.*rhsD;
+        rhs = rhs + gamma.*u;
         
         %this is where all the computation happens
         yy = reshape(rhs,[numel(rhs) 1]);
-        [u,~,~,iterc] = pcg(AtA, yy, 1e-5, 100);
+        [u,~,~,iterc] = pcg(AtA, yy, 1e-6, 100);
         iters = [iters iterc];
         fprintf('pcg iters: %i\n',iterc);
         
@@ -126,7 +132,8 @@ while(sum(iters) < maxiter)
     res_errors_per_breg = [res_errors_per_breg norm(A(reshape(u, [m*n*k 1])) - f,'fro')/norm(f,'fro')];
     errors_per_breg = [errors_per_breg norm3(u./max(u(:)) - img./max(img(:)))];
     
-    if video
+    if (video && randi(10) == 3)
+        if(ndims(u)==3)
         %%
         whitebg('k');       
         h = vol3d('cdata',abs(u),'texture','3D');
@@ -139,33 +146,38 @@ while(sum(iters) < maxiter)
         end
         
         pause(.03);
+        else if (ndims(u)==2)
+                subplot(2,2,1);
+                imagesc(real(img));
+                title('exact image');
         
-        %         subplot(2,2,1);
-        %         imagesc(real(img));
-        %         title('exact image');
-        %
-        %         subplot(2,2,2);
-        %         imagesc(real(u));
-        %         title('current reconstruction');
-        %
-        %         subplot(2,2,4);
-        %         errorfig = abs(u/max(u(:)) - img/max(img(:)));
-        %         imagesc(errorfig);
-        %         title('reconstruction error');
-        %
-        %         subplot(6,2,7);
-        %         semilogy(errors);
-        %         title('image domain error');
-        %         subplot(6,2,11);
-        %         semilogy(res_errors,'r.-');
-        %         title('residual error');
-        %
-        %         colormap hot;
-        %         pause(0.03);
-        %
-        fprintf('step ell = %i error (u-img): %f Ax iter numer: %i \n', [ell errors(end) sum(iters)]);
+                subplot(2,2,2);
+                imagesc(real(u));
+                title('current reconstruction');
+        
+                subplot(2,2,4);
+                errorfig = abs(u/max(u(:)) - img/max(img(:)));
+                imagesc(errorfig);
+                title('reconstruction error');
+        
+                subplot(6,2,7);
+                semilogy(errors_per_breg);
+                title('image domain error per breg');
+                subplot(6,2,11);
+                semilogy(res_errors_per_breg,'r.-');
+                title('residual error per breg');
+        
+                colormap hot;
+                pause(0.03);
+        
+            end
+        end
     end
+    fprintf('breg step ell = %i error (u-img): %f Ax iter numer: %i \n', [ell errors(end) sum(iters)]);
+    fprintf('breg step ell = %i res error : %f Ax iter numer: %i \n---\n', [ell res_errors(end) sum(iters)]);
     
+
+
 end
 
 

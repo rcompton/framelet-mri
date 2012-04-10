@@ -1,7 +1,7 @@
 %
 % CS-framelet recon with general operator A
 %
-close all;clear all;clc;
+close all;clear all;
 
 addpath('./Framelet/'); %Jai Feng Cai's Framelet library
 addpath('./BregmanCookbook/'); %Jerome Gilles' Bregman library (has some framelet stuff)
@@ -21,7 +21,7 @@ img = double(imread('phantom.gif'));
 %img = double(imread('brainweb_t1.jpg'));
 
 %resize to a nice square
-n = 64;
+n = 512;
 img = imresize(img,[n n]);
 m=n;
 
@@ -124,8 +124,7 @@ At = @(x) samplefun_nufft(st,B,C,x,m,n,1);
 %% Now that we have a system operator, sample the data in k space
 
 %create sample data
-%f = single(A(vec(img)));
-f = A(vec(img));
+f = single(A(vec(img)));
 
 %not sure why Tom did this normalization. It works really well though.
 normFactor = 1/norm(f(:)/m);
@@ -151,7 +150,7 @@ lambda = 1.4;
 gamma = 25;
 
 %the number of times I'm willing to apply A
-maxiters = 1231;
+maxiters = 231;
 
 %watch a video as you do all this?
 video = 1;
