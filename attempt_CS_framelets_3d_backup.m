@@ -24,11 +24,11 @@ stream = RandStream('mt19937ar');
 %img = imresize(img,[128,128]);
 
 %easy 3D
-%img = zeros(32,32,32);
-%img(12:20,8:15:9:20) = 1.0;
-%img(20:30,8:15,3:7) = 2.0;
-%img(15:24,20:30,18:27) = 3.8;
-%img = img + shiftdim(img,2);
+img = zeros(32,32,32);
+img(12:20,8:15:9:20) = 1.0;
+img(20:30,8:15,3:7) = 2.0;
+img(15:24,20:30,18:27) = 3.8;
+img = img + shiftdim(img,2);
 
 
 %load littlebabymri.mat;
@@ -129,15 +129,15 @@ exci = 1;
 %the splitting parameters. There's probably another optimization to figure
 %how to pick the best ones...
 mu = 1;
-lambda = .5;
-gammah = 5;
+lambda = 1;
+gammah = 1;
 %gammah = 0;
 
 %the number of times I'm willing to apply A
-maxiters = 3000;
+maxiters = 2000;
 
 %number of bregs
-max_bregs = 1500;
+max_bregs = 70;
 
 %watch a video as you do all this?
 video = 0;
@@ -251,7 +251,7 @@ while(sum(iters) < maxiters && res_errors(end)>1e-5 && ell < max_bregs)
         
         %this is where all the computation happens
         macpcg = 150;
-        [u,flagcg,~,iterc] = pcg(AtA, reshape(rhs,[numel(rhs) 1]), 1e-7, macpcg);
+        [u,flagcg,~,iterc] = pcg(AtA, reshape(rhs,[numel(rhs) 1]), 1e-3, macpcg);
         
         %Tom's way
   %       iterc = 1;
