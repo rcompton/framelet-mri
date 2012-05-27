@@ -1,36 +1,33 @@
 function [ y ] = samplefun(R,B,C,x,t)
 %sum Bl*G*Cl x
-%C is a M by NL matrix with blocks that correspond to the diag(C) that you
-%see in the papers
-%x is a column vector (you need this for pcg etc.)
-%output is a column vector
+%R is random sample matrix
+%B is n^2 by L
+%C is L by n^2
+%x is the image, in vector format
 %t is for transpose
 
-[m nl] = size(B);
-[mn one] = size(x);
+n = sqrt(size(B,1));
+assert(n == round(n));
+x = reshape(x,[n n]);
+y = zeros(size(x));
+scal = sqrt(n*n);
 
-n = mn/m;
-
-x = reshape(x,m,n);
-
-L = nl/n;
-
-scale = sqrt(m*n);
-
-y = zeros(m,n);
-if t
-    for l=1:L
-        Bx = B(:, (l-1)*n +1 : l*n).*x;
-        y = y + C(:,(l-1)*n +1 : l*n).*ifft2( R.*Bx )*scale;
+if ~t
+    for l=1:size(B,2)
+        Bl = reshape(B(:,l),[n n]);
+        Cl = reshape(C(l,:),[n n]);
+        
+        y = y + Bl.*R.*(1/scal).*fft2(Cl.*x);
     end
-    
 else
-    for l=1:L
-        Cx = C(:, (l-1)*n +1 : l*n).*x;
-        y = y + B(:,(l-1)*n +1 : l*n).*R.*fft2( Cx )/scale;
+    for l=1:size(B,2)
+        Bl = reshape(B(:,l),[n n]);
+        Cl = reshape(C(l,:),[n n]);
+        
+        y = y + conj(Cl).*scal.*ifft2(R.*conj(Bl).*x);
     end
 end
 
-y = reshape(y,numel(y),1);
+y = reshape(y,[numel(y) 1]);
 end
 

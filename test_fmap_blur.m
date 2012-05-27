@@ -9,6 +9,8 @@ load onetwentyeightE.mat
 img = double(D(:,:,10));
 img = imresize(img,[n n]);
 
+img = phantom('Modified Shepp-Logan',n);
+
 %EF = (B*C).*kron(dftmtx(n),dftmtx(n));
 %imgblr = ifft2(reshape( EF*reshape(img,[n*n 1]), [n n]) );
 

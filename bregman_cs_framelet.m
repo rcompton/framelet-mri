@@ -87,7 +87,7 @@ while(sum(iters) < maxiter)
         
         %this is where all the computation happens
         yy = reshape(rhs,[numel(rhs) 1]);
-        [u,~,~,iter] = pcg(AtA, yy, 1e-4, 30);
+        [u,~,~,iter] = pcg(AtA, yy, 1e-6, 30);
         iters = [iters iter];
         
 %       fprintf('                                 pcg error: %d, iter: %i \n', [reles iter]);
