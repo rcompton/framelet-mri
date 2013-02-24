@@ -31,7 +31,7 @@ norm3 = @(x) sqrt(trapz(trapz(trapz(abs(x).^2))));
 [D,Dt]=GenerateFrameletFilter(2);
 %more levels is better? I don't know. Experimentally, more levels is slow
 %and worse quality. Hmmm.
-n_level = 3;
+n_level = 1;
 
 %set initial guesses for framelets
 U = FraDecMultiLevel(zeros(m,n),D,n_level);
@@ -41,10 +41,12 @@ bw = U;
 
 %check that we chose sane parameters
 if nu == 0
-    assert(lambda == 0);
+    %assert(lambda == 0);
+    lambda = 0;
 end
 if exci == 0
-    assert(gammah == 0);
+    %assert(gammah == 0);
+    gammah = 0;
 end
 
 %create the AtA operator. for some reason lk convolution like this (not conv2) works best.
@@ -120,9 +122,9 @@ while(sum(iters) < maxiters)
         
         %update d's
         Fu = FraDecMultiLevel(u,D,n_level);
-        U0 = AddFrameletArray(Fu, bw); %Fu + b_k
+        Fupbw = AddFrameletArray(Fu, bw); %Fu + b_k
         if gammah ~= 0 && exci ~= 0
-            dw = ShrinkFramelet(U0, 1/(gammah/exci));
+            dw = ShrinkFramelet(Fupbw, 1/(gammah/exci));
         end
         
         if lambda ~=0 && nu ~= 0
@@ -130,17 +132,19 @@ while(sum(iters) < maxiters)
         end
        
         %update b's       
-        bw = SubFrameletArray(U0,dw); %Fu-d_k
+        bw = SubFrameletArray(Fupbw,dw); %Fu-d_k
         bx = bx + (Deriv(u,1,false) - dx);
         by = by + (Deriv(u,2,false) - dy);
         
         res_errors = [res_errors norm(A(reshape(u, [m*n*k 1])) - f,'fro')/norm(f,'fro')];
-        errors = [errors norm3(u./max(u(:)) - img./max(img(:)))];
+        uerr = u/norm(u)*norm(img);
+        errors = [errors norm(abs(uerr) - img)/norm(img)];
         
     end
     fl = fl + f - A(reshape(u, [m*n 1]));
     res_errors_per_breg = [res_errors_per_breg norm(A(reshape(u, [m*n 1])) - f)/norm(f)];
-    errors_per_breg = [errors_per_breg norm(u - img)/norm(img)];
+    uerr = (real(u)/norm(real(u)))*norm(img);
+    errors_per_breg = [errors_per_breg norm(real(uerr) - img)/norm(img)];
     
     %
     % Make video
@@ -173,7 +177,7 @@ while(sum(iters) < maxiters)
         
                 subplot(2,2,2);
                 imagesc(real(u));
-                title('current reconstruction');
+                title('current reconstruction, real part');
         
                 subplot(2,2,4);
                 errorfig = abs(u/max(u(:)) - img/max(img(:)));

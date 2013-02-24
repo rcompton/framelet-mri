@@ -28,12 +28,13 @@ for l=1:size(B,2)
 end
 
 imgfastblr = ifft2(BCimg);
-
-figure
+%%
+h=figure
 imagesc(img);
 colormap bone
-%figure
-%imagesc(abs(imgblr));
+figure
+imagesc(reshape(fmap,[n n]));
+colormap bone
 figure
 imagesc(abs(imgfastblr));
 colormap bone
